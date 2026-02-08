@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">新增玩家</h2>
+
+<form action="/add" method="post" id="add-form">
+  <div class="mb-3">
+    <label for="name" class="form-label">玩家名稱</label>
+    <input type="text" class="form-control" name="name" required>
+  </div>
+
+  <div class="mb-3">
+    <label for="job" class="form-label">職業</label>
+    <select class="form-select" name="job" required>
+      <option value="">請選擇</option>
+      <option value="鐵衣">鐵衣</option>
+      <option value="血河">血河</option>
+      <option value="碎夢">碎夢</option>
+      <option value="神相">神相</option>
+      <option value="九靈">九靈</option>
+      <option value="玄機">玄機</option>
+      <option value="素問">素問</option>
+    </select>
+  </div>
+
+  <div class="mb-3 form-check">
+    <input type="checkbox" class="form-check-input" name="leave" id="leave">
+    <label class="form-check-label" for="leave">請假</label>
+  </div>
+
+  <div class="mb-3">
+    <label for="group_name" class="form-label">分組</label>
+    <input type="text" class="form-control" name="group_name">
+  </div>
+
+  <div class="mb-3">
+    <label for="team_name" class="form-label">隊伍</label>
+    <input type="text" class="form-control" name="team_name">
+  </div>
+
+  <div class="mb-3">
+    <label for="role_note" class="form-label">備註</label>
+    <input type="text" class="form-control" name="role_note">
+  </div>
+
+  <button type="submit" class="btn btn-primary">新增</button>
+</form>
+
+<script>
+  $('#add-form').on('submit', function(e) {
+    e.preventDefault();
+    $.post('/add', $(this).serialize(), function(response) {
+      if (response.status === 'success') {
+        alert('新增成功！');
+        window.location.href = '/';  // 跳回首頁（首頁有頁首）
+      }
+    });
+  });
+</script>
+{% endblock %}

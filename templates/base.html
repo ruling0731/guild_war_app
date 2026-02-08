@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>醉臥泡影間</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<!-- 回到頁首圓形按鈕 -->
+<button id="backToTop" 
+        class="btn btn-primary rounded-circle"
+        style="position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 20px; padding: 0; opacity: 0; transition: opacity 0.5s, background-color 0.3s;">
+  ↑
+</button>
+
+<script>
+document.addEventListener("scroll", function(){
+  var btn = document.getElementById("backToTop");
+  if(window.scrollY > 200){
+    btn.style.opacity = "1";
+    btn.style.pointerEvents = "auto";
+  } else {
+    btn.style.opacity = "0";
+    btn.style.pointerEvents = "none";
+  }
+});
+
+document.getElementById("backToTop").addEventListener("click", function(){
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// 滑鼠移入變色
+document.getElementById("backToTop").addEventListener("mouseover", function(){
+  this.style.backgroundColor = "#ff9800"; // 橘色
+});
+document.getElementById("backToTop").addEventListener("mouseout", function(){
+  this.style.backgroundColor = ""; // 回復原本的 Bootstrap 藍色
+});
+</script>
+
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">醉臥泡影間</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      aria-controls="navbarNav" aria-expanded="false" aria-label="切換導覽">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link" href="/">首頁</a></li>
+        <li class="nav-item"><a class="nav-link" href="/add_player">新增玩家</a></li>
+        <li class="nav-item"><a class="nav-link" href="/batch_add">批量新增</a></li>
+        <li class="nav-item"><a class="nav-link" href="/delete_page">刪除玩家</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="jobDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            職業分頁
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="jobDropdown">
+            <li><a class="dropdown-item" href="/job/鐵衣">鐵衣</a></li>
+            <li><a class="dropdown-item" href="/job/血河">血河</a></li>
+            <li><a class="dropdown-item" href="/job/碎夢">碎夢</a></li>
+            <li><a class="dropdown-item" href="/job/神相">神相</a></li>
+            <li><a class="dropdown-item" href="/job/九靈">九靈</a></li>
+            <li><a class="dropdown-item" href="/job/玄機">玄機</a></li>
+            <li><a class="dropdown-item" href="/job/素問">素問</a></li>
+            <li><a class="dropdown-item" href="/job/龍吟">龍吟</a></li>
+          </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="/group">分組管理</a></li>
+        <li class="nav-item"><a class="nav-link" href="/export_all">匯出 Excel</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

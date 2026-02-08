@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="alert alert-success mt-4" role="alert">
+  <h4 class="alert-heading">新增成功！</h4>
+  <p>已成功新增 <strong>{{ count }}</strong> 位玩家。</p>
+  <hr>
+  <a href="{{ url_for('index') }}" class="btn btn-primary">回首頁</a>
+  <a href="{{ url_for('batch_add') }}" class="btn btn-secondary">繼續新增</a>
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">{{ job }} 玩家列表</h2>
+
+<table class="table table-bordered table-hover align-middle">
+  <thead class="table-dark">
+    <tr>
+      <th>名字</th>
+      <th>分組</th>
+      <th>隊伍</th>
+      <th>備註</th>
+      <th>狀態</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for player in players %}
+    <tr>
+      <td>{{ player.player_name }}</td>
+      <td>{{ player.group_name or '' }}</td>
+      <td>{{ player.team_name or '' }}</td>
+      <td>{{ player.role_note or '' }}</td>
+      <td>
+        {% if player.can_fight %}
+          <span class="badge bg-success">能打</span>
+        {% else %}
+          <span class="badge bg-danger">請假</span>
+        {% endif %}
+      </td>
+      <td>
+        <form method="post" action="/toggle/{{ player.id }}">
+          <button type="submit" class="btn btn-sm btn-outline-secondary">切換狀態</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

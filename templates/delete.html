@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">刪除玩家</h2>
+
+<table class="table table-bordered table-striped">
+    <thead class="table-dark">
+        <tr>
+            <th>姓名</th>
+            <th>職業</th>
+            <th>分組</th>
+            <th>隊伍</th>
+            <th>備註</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for player in players %}
+        <tr id="row-{{ player.id }}">
+            <td>{{ player.player_name }}</td>
+            <td>{{ player.job }}</td>
+            <td>{{ player.group_name or '' }}</td>
+            <td>{{ player.team_name or '' }}</td>
+            <td>{{ player.role_note or '' }}</td>
+            <td>
+                <button class="btn btn-danger btn-sm delete-btn" data-id="{{ player.id }}">
+                    🗑️ 刪除
+                </button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+    $(document).on('click', '.delete-btn', function() {
+        var playerId = $(this).data('id');
+        if (confirm("確定要刪除嗎？")) {
+            $.post('/delete/' + playerId, function(response) {
+                if (response.status === "success") {
+                    $("#row-" + playerId).remove(); // 即時移除該列
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">批量新增玩家</h2>
+
+<form method="post" id="batchForm">
+  <div class="mb-3">
+    <label for="players" class="form-label">請輸入玩家資料 (一行一位)</label>
+    <textarea class="form-control" id="players" name="players" rows="10"
+      placeholder="格式：名字,職業,備註 (備註可省略)&#10;例：鳳青河,鐵衣&#10;白皓月,血河,候補"></textarea>
+  </div>
+
+  <div class="alert alert-info">
+    可用職業：鐵衣、血河、碎夢、神相、九靈、玄機、素問、龍吟
+  </div>
+
+  <div id="errorBox" class="alert alert-danger d-none"></div>
+
+  <button type="submit" class="btn btn-primary">批量新增</button>
+</form>
+
+<script>
+document.getElementById("batchForm").addEventListener("submit", function(event){
+  var textarea = document.getElementById("players");
+  var lines = textarea.value.trim().split("\n");
+  var validJobs = ["鐵衣","血河","碎夢","神相","九靈","玄機","素問","龍吟"];
+  var errors = [];
+
+  lines.forEach(function(line, idx){
+    var parts = line.split(",");
+    if(parts.length < 2){
+      errors.push("第 " + (idx+1) + " 行格式錯誤：至少需要 名字,職業");
+    } else {
+      var job = parts[1].trim();
+      if(!validJobs.includes(job)){
+        errors.push("第 " + (idx+1) + " 行職業錯誤：" + job);
+      }
+    }
+  });
+
+  if(errors.length > 0){
+    event.preventDefault();
+    var errorBox = document.getElementById("errorBox");
+    errorBox.classList.remove("d-none");
+    errorBox.innerHTML = "<h5>錯誤：</h5><ul>" + errors.map(e => "<li>"+e+"</li>").join("") + "</ul>";
+  }
+});
+</script>
+{% endblock %}

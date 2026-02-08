@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">分組管理</h2>
+
+<table class="table table-bordered table-striped">
+    <thead class="table-dark">
+        <tr>
+            <th>姓名</th>
+            <th>職業</th>
+            <th>分組</th>
+            <th>隊伍</th>
+            <th>備註</th>
+            <th>狀態</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for player in players %}
+        <tr id="row-{{ player.id }}">
+            <td>{{ player.player_name }}</td>
+            <td>{{ player.job }}</td>
+            <td>
+                <select class="form-select group-select" id="group-{{ player.id }}">
+                    <option value="">未分組</option>
+                    <option value="紅塵拆塔" {% if player.group_name == '紅塵拆塔' %}selected{% endif %}>紅塵拆塔</option>
+                    <option value="小崴大團" {% if player.group_name == '小崴大團' %}selected{% endif %}>小崴大團</option>
+                    <option value="步步機動" {% if player.group_name == '步步機動' %}selected{% endif %}>步步機動</option>
+                </select>
+            </td>
+            <td>
+                <select class="form-select team-select" id="team-{{ player.id }}">
+                    <option value="">未分隊</option>
+                    <option value="第一隊" {% if player.team_name == '第一隊' %}selected{% endif %}>第一隊</option>
+                    <option value="第二隊" {% if player.team_name == '第二隊' %}selected{% endif %}>第二隊</option>
+                    <option value="第三隊" {% if player.team_name == '第三隊' %}selected{% endif %}>第三隊</option>
+                    <option value="第四隊" {% if player.team_name == '第四隊' %}selected{% endif %}>第四隊</option>
+                    <option value="第五隊" {% if player.team_name == '第五隊' %}selected{% endif %}>第五隊</option>
+                </select>
+            </td>
+            <td>
+                <input type="text" class="form-control note-input" id="note-{{ player.id }}" value="{{ player.role_note or '' }}">
+            </td>
+            <td>
+                {% if player.can_fight %}
+                    <span class="badge bg-success">能打</span>
+                {% else %}
+                    <span class="badge bg-secondary">請假</span>
+                {% endif %}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-primary save-btn" data-id="{{ player.id }}">儲存</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+$(document).on('click', '.save-btn', function() {
+    var playerId = $(this).data('id');
+    var groupName = $("#group-" + playerId).val();
+    var teamName = $("#team-" + playerId).val();
+    var roleNote = $("#note-" + playerId).val();
+
+    $.post('/update_group/' + playerId, {
+        group_name: groupName,
+        team_name: teamName,
+        role_note: roleNote
+    }, function(response) {
+        if (response.status === "success") {
+            alert("更新成功！");
+        }
+    });
+});
+</script>
+{% endblock %}

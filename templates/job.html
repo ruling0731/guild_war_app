@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">{{ job }} 職業分配</h2>
+
+<table class="table table-bordered table-striped">
+    <thead class="table-dark">
+        <tr>
+            <th>分組</th>
+            <th>隊伍</th>
+            <th>姓名</th>
+            <th>職業</th>
+            <th>備註</th>
+            <th>狀態</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for player in players %}
+        <tr>
+            <td>{{ player.group_name or '未分組' }}</td>
+            <td>{{ player.team_name or '未分隊' }}</td>
+            <td>{{ player.player_name }}</td>
+            <td>{{ player.job }}</td>
+            <td>{{ player.role_note or '' }}</td>
+            <td>
+                {% if player.can_fight %}
+                    <span class="badge bg-success">能打</span>
+                {% else %}
+                    <span class="badge bg-secondary">請假</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
