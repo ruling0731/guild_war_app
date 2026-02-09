@@ -2,45 +2,66 @@
 {% block content %}
 <h2 class="mb-4">刪除玩家</h2>
 
-<table class="table table-bordered table-striped">
-    <thead class="table-dark">
-        <tr>
-            <th>姓名</th>
-            <th>職業</th>
-            <th>分組</th>
-            <th>隊伍</th>
-            <th>備註</th>
-            <th>操作</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for player in players %}
-        <tr id="row-{{ player.id }}">
-            <td>{{ player.player_name }}</td>
-            <td>{{ player.job }}</td>
-            <td>{{ player.group_name or '' }}</td>
-            <td>{{ player.team_name or '' }}</td>
-            <td>{{ player.role_note or '' }}</td>
-            <td>
-                <button class="btn btn-danger btn-sm delete-btn" data-id="{{ player.id }}">
-                    🗑️ 刪除
-                </button>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
+<table class="table table-bordered table-hover align-middle text-center">
+  <thead>
+    <tr>
+      {% for job in job_styles.keys() %}
+        <th style="background-color:{{ job_styles[job].bg }}; color:{{ job_styles[job].fg }};">
+          {{ job }}
+        </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for i in range(max_len) %}
+    <tr>
+      {% for job in job_styles.keys() %}
+        <td>
+          {% if grouped[job]|length > i %}
+            <div class="d-flex justify-content-between align-items-center">
+              <!-- 名字區塊：固定寬度 + 文字截斷 -->
+              <span class="player-name">
+                {{ grouped[job][i].player_name }}
+              </span>
+              <!-- 統一大小的刪除按鈕 -->
+              <button class="btn btn-danger btn-sm delete-btn flex-shrink-0" 
+                      style="width:70px;" 
+                      data-id="{{ grouped[job][i].id }}">
+                刪除
+              </button>
+            </div>
+          {% endif %}
+        </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
 </table>
 
+<style>
+  /* 名字優化：固定寬度 + 超過長度自動截斷 */
+  .player-name {
+    display: inline-block;
+    max-width: 120px;   /* 名字最大寬度 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14px;    /* 統一字體大小 */
+    text-align: left;
+  }
+</style>
+
 <script>
-    $(document).on('click', '.delete-btn', function() {
-        var playerId = $(this).data('id');
-        if (confirm("確定要刪除嗎？")) {
-            $.post('/delete/' + playerId, function(response) {
-                if (response.status === "success") {
-                    $("#row-" + playerId).remove(); // 即時移除該列
-                }
-            });
+  // 刪除玩家
+  $(document).on('click', '.delete-btn', function() {
+    var playerId = $(this).data('id');
+    if (confirm("確定要刪除嗎？")) {
+      $.post('/delete/' + playerId, function(response) {
+        if (response.status === "success") {
+          location.reload(); // 重新整理表格，避免空格
         }
-    });
+      });
+    }
+  });
 </script>
 {% endblock %}

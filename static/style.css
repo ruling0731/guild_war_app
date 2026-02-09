@@ -107,11 +107,3 @@ h2, h1 {
     border-radius: 4px;
 }
 
-.text-bg-warning { background-color: #FFA500; color: #000; } /* 鐵衣 */
-.text-bg-danger { background-color: #FF0000; color: #fff; } /* 血河 */
-.text-bg-info { background-color: #ADD8E6; color: #000; }   /* 碎夢 */
-.text-bg-primary { background-color: #0e536e; color: #fff; }/* 神相 */
-.text-bg-purple { background-color: #bd6dbd; color: #fff; } /* 九靈 */
-.text-bg-yellow { background-color: #f0f02c; color: #000; } /* 玄機 */
-.text-bg-pink { background-color: #FFC0CB; color: #000; }   /* 素問 */
-.text-bg-success { background-color: #34bd34; color: #fff; }/* 龍吟 */

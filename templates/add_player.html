@@ -2,7 +2,7 @@
 {% block content %}
 <h2 class="mb-4">新增玩家</h2>
 
-<form action="/add" method="post" id="add-form">
+<form action="/add_player" method="post" id="add-form">
   <div class="mb-3">
     <label for="name" class="form-label">玩家名稱</label>
     <input type="text" class="form-control" name="name" required>
@@ -19,22 +19,13 @@
       <option value="九靈">九靈</option>
       <option value="玄機">玄機</option>
       <option value="素問">素問</option>
+      <option value="龍吟">龍吟</option>
     </select>
   </div>
 
   <div class="mb-3 form-check">
     <input type="checkbox" class="form-check-input" name="leave" id="leave">
     <label class="form-check-label" for="leave">請假</label>
-  </div>
-
-  <div class="mb-3">
-    <label for="group_name" class="form-label">分組</label>
-    <input type="text" class="form-control" name="group_name">
-  </div>
-
-  <div class="mb-3">
-    <label for="team_name" class="form-label">隊伍</label>
-    <input type="text" class="form-control" name="team_name">
   </div>
 
   <div class="mb-3">
@@ -48,10 +39,10 @@
 <script>
   $('#add-form').on('submit', function(e) {
     e.preventDefault();
-    $.post('/add', $(this).serialize(), function(response) {
+    $.post('/add_player', $(this).serialize(), function(response) {
       if (response.status === 'success') {
         alert('新增成功！');
-        window.location.href = '/';  // 跳回首頁（首頁有頁首）
+        window.location.href = '/';  // 跳回首頁
       }
     });
   });

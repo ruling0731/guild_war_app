@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, jsonify, make_response
+from flask import Flask, render_template, request, jsonify, make_response, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import pandas as pd
 from io import BytesIO
+from collections import defaultdict
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///guild_war.db'
@@ -19,18 +20,24 @@ class Player(db.Model):
     team_name = db.Column(db.String(50))
     role_note = db.Column(db.String(100))
 
-# 首頁：職業統計 + 分組顯示
+# 首頁：大表格顯示 + 職業統計
 @app.route('/')
 def index():
     jobs = ["鐵衣", "血河", "碎夢", "神相", "九靈", "玄機", "素問", "龍吟"]
+
     stats = {}
     for job in jobs:
         total = Player.query.filter_by(job=job).count()
         leave = Player.query.filter_by(job=job, can_fight=False).count()
         stats[job] = {"total": total, "leave": leave, "can_fight": total - leave}
 
-    grouped = {job: Player.query.filter_by(job=job).all() for job in jobs}
-    return render_template('index.html', stats=stats, grouped=grouped, jobs=jobs)
+    grouped = defaultdict(list)
+    for p in Player.query.all():
+        grouped[p.job].append(p)
+
+    max_len = max((len(v) for v in grouped.values()), default=0)
+
+    return render_template('index.html', stats=stats, grouped=grouped, jobs=jobs, max_len=max_len)
 
 # 新增玩家
 @app.route('/add_player', methods=['GET'])
@@ -92,28 +99,42 @@ def batch_add():
 
     return render_template('batch_add.html')
 
-# 分組管理
-@app.route('/group')
-def group_page():
-    players = Player.query.all()
-    return render_template('group.html', players=players)
-
-@app.route('/update_group/<int:id>', methods=['POST'])
-def update_group(id):
-    player = Player.query.get_or_404(id)
-    player.group_name = request.form.get('group_name')
-    player.team_name = request.form.get('team_name')
-    player.role_note = request.form.get('role_note')
-    db.session.commit()
-    return jsonify({"status": "success"})
-
-# 職業分頁（純顯示）
-@app.route('/job/<job>')
+# 職業分頁（總覽 + 批次更新）
+@app.route('/job/<job>', methods=['GET', 'POST'])
 def job_page(job):
     players = Player.query.filter_by(job=job).all()
+
+    if request.method == 'POST':
+        for player in players:
+            player.group_name = request.form.get(f"group_name_{player.id}") or None
+            player.team_name = request.form.get(f"team_name_{player.id}") or None
+            player.role_note = request.form.get(f"role_note_{player.id}") or None
+        db.session.commit()
+        return redirect(url_for('job_page', job=job))
+
     return render_template('job.html', job=job, players=players)
 
+# 單一玩家編輯頁面
+@app.route('/job_detail/<int:id>', methods=['GET', 'POST'])
+def job_detail(id):
+    player = Player.query.get_or_404(id)
+
+    if request.method == 'POST':
+        player.group_name = request.form.get('group_name')
+        player.team_name = request.form.get('team_name')
+        player.role_note = request.form.get('role_note')
+        # 更新能打/請假
+        can_fight_val = request.form.get('can_fight')
+        player.can_fight = True if can_fight_val == "true" else False
+
+        db.session.commit()
+        return redirect(url_for('job_page', job=player.job))
+
+    return render_template('job_detail.html', player=player)
+
 # 匯出 Excel
+from urllib.parse import quote
+
 @app.route('/export_all')
 def export_all():
     players = Player.query.all()
@@ -129,24 +150,23 @@ def export_all():
     df = pd.DataFrame(data)
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        # 主表
         df.to_excel(writer, sheet_name="大表", index=False)
-
-        # 分組表（排除 None 和空字串）
         for group in df["分組"].dropna().unique():
-            if group.strip():  # 確保不是空字串
+            if group.strip():
                 df[df["分組"] == group].to_excel(writer, sheet_name=group, index=False)
-
-        # 候補表（沒有分隊的）
         candidate_df = df[df["隊伍"].isna() | (df["隊伍"] == "")]
         if not candidate_df.empty:
             candidate_df.to_excel(writer, sheet_name="候補", index=False)
 
     output.seek(0)
     response = make_response(output.read())
-    response.headers["Content-Disposition"] = "attachment; filename=醉臥泡影間.xlsx"
+
+    # 中文檔名處理：用 RFC 5987 編碼
+    filename = "醉臥泡影間.xlsx"
+    response.headers["Content-Disposition"] = f"attachment; filename=guild.xlsx; filename*=UTF-8''{quote(filename)}"
     response.mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return response
+
 # 切換能打 / 請假
 @app.route('/toggle/<int:id>', methods=['POST'])
 def toggle_status(id):
@@ -158,8 +178,12 @@ def toggle_status(id):
 # 刪除玩家
 @app.route('/delete_page')
 def delete_page():
-    players = Player.query.all()
-    return render_template('delete.html', players=players)
+    jobs = ["鐵衣", "血河", "碎夢", "神相", "九靈", "玄機", "素問", "龍吟"]
+    grouped = defaultdict(list)
+    for p in Player.query.all():
+        grouped[p.job].append(p)
+    max_len = max((len(v) for v in grouped.values()), default=0)
+    return render_template('delete.html', grouped=grouped, jobs=jobs, max_len=max_len)
 
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete_player(id):

@@ -8,6 +8,8 @@
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 
+<body>
+
 <!-- 回到頁首圓形按鈕 -->
 <button id="backToTop" 
         class="btn btn-primary rounded-circle"
@@ -40,8 +42,6 @@ document.getElementById("backToTop").addEventListener("mouseout", function(){
 });
 </script>
 
-<body>
-
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
   <div class="container-fluid">
     <a class="navbar-brand" href="/">醉臥泡影間</a>
@@ -71,7 +71,6 @@ document.getElementById("backToTop").addEventListener("mouseout", function(){
             <li><a class="dropdown-item" href="/job/龍吟">龍吟</a></li>
           </ul>
         </li>
-        <li class="nav-item"><a class="nav-link" href="/group">分組管理</a></li>
         <li class="nav-item"><a class="nav-link" href="/export_all">匯出 Excel</a></li>
       </ul>
     </div>
@@ -79,6 +78,17 @@ document.getElementById("backToTop").addEventListener("mouseout", function(){
 </nav>
 
 <div class="container">
+  {% set job_styles = {
+    "鐵衣": {"bg":"#FFD8A8", "fg":"#000"},
+    "血河": {"bg":"#FFB3B3", "fg":"#000"},
+    "碎夢": {"bg":"#B3E5FC", "fg":"#000"},
+    "神相": {"bg":"#A7C7E7", "fg":"#000"},
+    "九靈": {"bg":"#E1BEE7", "fg":"#000"},
+    "玄機": {"bg":"#FFF59D", "fg":"#000"},
+    "素問": {"bg":"#F8BBD0", "fg":"#000"},
+    "龍吟": {"bg":"#C8E6C9", "fg":"#000"}
+  } %}
+  
   {% block content %}{% endblock %}
 </div>
 

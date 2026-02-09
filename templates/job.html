@@ -1,35 +1,123 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 class="mb-4">{{ job }} 職業分配</h2>
+<h2 class="mb-4 text-center" style="color:#1760a5;">🌸 {{ job }} 🌸</h2>
 
-<table class="table table-bordered table-striped">
-    <thead class="table-dark">
-        <tr>
-            <th>分組</th>
-            <th>隊伍</th>
-            <th>姓名</th>
-            <th>職業</th>
-            <th>備註</th>
-            <th>狀態</th>
-        </tr>
+<form method="post">
+  <table class="table table-bordered table-hover align-middle text-center shadow-sm" style="background-color:#fffafc;">
+    <thead style="background-color:#fcd2e7; color:rgb(13, 35, 107);">
+      <tr>
+        <th>名字</th>
+        <th>分組</th>
+        <th>隊伍</th>
+        <th>狀態</th>
+        <th>備註</th>
+      </tr>
     </thead>
     <tbody>
-        {% for player in players %}
-        <tr>
-            <td>{{ player.group_name or '未分組' }}</td>
-            <td>{{ player.team_name or '未分隊' }}</td>
-            <td>{{ player.player_name }}</td>
-            <td>{{ player.job }}</td>
-            <td>{{ player.role_note or '' }}</td>
-            <td>
-                {% if player.can_fight %}
-                    <span class="badge bg-success">能打</span>
-                {% else %}
-                    <span class="badge bg-secondary">請假</span>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
+      {% for player in players %}
+      <tr>
+        <!-- 名字 -->
+        <td><span class="fw-bold text-primary">{{ player.player_name }}</span></td>
+
+        <!-- 分組顏色標籤 + 下拉 -->
+        <td>
+          {% if player.group_name == "紅塵拆塔" %}
+            <span class="badge rounded-pill bg-danger">{{ player.group_name }}</span>
+          {% elif player.group_name == "小崴大團" %}
+            <span class="badge rounded-pill bg-primary">{{ player.group_name }}</span>
+          {% elif player.group_name == "步步機動" %}
+            <span class="badge rounded-pill bg-warning text-dark">{{ player.group_name }}</span>
+          {% else %}
+            <span class="badge rounded-pill bg-secondary">未分組</span>
+          {% endif %}
+          <select class="form-select form-select-sm mt-1" name="group_name_{{ player.id }}">
+            <option value="" {% if not player.group_name %}selected{% endif %}>未分組</option>
+            <option value="紅塵拆塔" {% if player.group_name == "紅塵拆塔" %}selected{% endif %}>紅塵拆塔</option>
+            <option value="小崴大團" {% if player.group_name == "小崴大團" %}selected{% endif %}>小崴大團</option>
+            <option value="步步機動" {% if player.group_name == "步步機動" %}selected{% endif %}>步步機動</option>
+          </select>
+        </td>
+
+        <!-- 隊伍顏色標籤 + 下拉 -->
+        <td>
+          {% if player.team_name == "第一隊" %}
+            <span class="badge rounded-pill bg-success">{{ player.team_name }}</span>
+          {% elif player.team_name == "第二隊" %}
+            <span class="badge rounded-pill bg-info text-dark">{{ player.team_name }}</span>
+          {% elif player.team_name == "第三隊" %}
+            <span class="badge rounded-pill bg-dark">{{ player.team_name }}</span>
+          {% elif player.team_name == "第四隊" %}
+            <span class="badge rounded-pill bg-secondary">{{ player.team_name }}</span>
+          {% elif player.team_name == "第五隊" %}
+            <span class="badge rounded-pill bg-warning text-dark">{{ player.team_name }}</span>
+          {% else %}
+            <span class="badge rounded-pill bg-light text-dark">未分隊</span>
+          {% endif %}
+          <select class="form-select form-select-sm mt-1" name="team_name_{{ player.id }}">
+            <option value="" {% if not player.team_name %}selected{% endif %}>未分隊</option>
+            <option value="第一隊" {% if player.team_name == "第一隊" %}selected{% endif %}>第一隊</option>
+            <option value="第二隊" {% if player.team_name == "第二隊" %}selected{% endif %}>第二隊</option>
+            <option value="第三隊" {% if player.team_name == "第三隊" %}selected{% endif %}>第三隊</option>
+            <option value="第四隊" {% if player.team_name == "第四隊" %}selected{% endif %}>第四隊</option>
+            <option value="第五隊" {% if player.team_name == "第五隊" %}selected{% endif %}>第五隊</option>
+          </select>
+        </td>
+
+        <!-- 狀態切換 -->
+        <td>
+          <button type="button"
+                  class="btn btn-sm rounded-pill {% if player.can_fight %}btn-success{% else %}btn-secondary{% endif %} toggle-btn"
+                  data-id="{{ player.id }}">
+            {% if player.can_fight %}能打{% else %}請假{% endif %}
+          </button>
+        </td>
+
+        <!-- 備註 -->
+        <td>
+          <input type="text" class="form-control form-control-sm rounded-pill"
+                 name="role_note_{{ player.id }}"
+                 value="{{ player.role_note or '' }}">
+        </td>
+      </tr>
+      {% endfor %}
     </tbody>
-</table>
+  </table>
+
+  <!-- 儲存按鈕 -->
+  <div class="text-end mt-4 mb-5"> <!-- 留空間避免貼死底部 -->
+    <button type="submit" class="btn btn-lg rounded-pill"
+            style="background-color:#fcd2e7; color:rgb(13, 35, 107); transition:0.3s;">
+      💾 儲存全部
+    </button>
+  </div>
+</form>
+
+<script>
+document.querySelectorAll(".toggle-btn").forEach(btn => {
+  btn.addEventListener("click", function() {
+    const playerId = this.dataset.id;
+    fetch(`/toggle/${playerId}`, {method: "POST"})
+      .then(response => response.json())
+      .then(data => {
+        if (data.can_fight) {
+          this.classList.remove("btn-secondary");
+          this.classList.add("btn-success");
+          this.textContent = "能打";
+        } else {
+          this.classList.remove("btn-success");
+          this.classList.add("btn-secondary");
+          this.textContent = "請假";
+        }
+      });
+  });
+});
+
+// hover 效果：儲存按鈕滑過去變深粉色
+document.querySelector("button[type='submit']").addEventListener("mouseover", function() {
+  this.style.backgroundColor = "#f7a9c4";
+});
+document.querySelector("button[type='submit']").addEventListener("mouseout", function() {
+  this.style.backgroundColor = "#fcd2e7";
+});
+</script>
 {% endblock %}
