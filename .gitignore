@@ -8,3 +8,5 @@ __pycache__/
 instance/
 .vscode/
 .idea/
+venv/
+.claude/

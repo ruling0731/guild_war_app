@@ -4,9 +4,15 @@ from flask_migrate import Migrate
 import pandas as pd
 from io import BytesIO
 from collections import defaultdict
+import os
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///guild_war.db'
+
+# 資料庫路徑設定（支援本地開發和 PythonAnywhere）
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'guild_war.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
