@@ -138,6 +138,28 @@ def job_detail(id):
 
     return render_template('job_detail.html', player=player)
 
+# 團隊編成頁面
+@app.route('/team_assign')
+def team_assign():
+    players = Player.query.all()
+    return render_template('team_assign.html', players=players)
+
+# 團隊編成儲存 API
+@app.route('/team_assign_update', methods=['POST'])
+def team_assign_update():
+    data = request.get_json()
+    if not data or 'assignments' not in data:
+        return jsonify({"status": "error", "message": "無效的資料格式"}), 400
+
+    for item in data['assignments']:
+        player = Player.query.get(item['id'])
+        if player:
+            player.group_name = item.get('group_name') or None
+            player.team_name = item.get('team_name') or None
+
+    db.session.commit()
+    return jsonify({"status": "success"})
+
 # 匯出 Excel
 from urllib.parse import quote
 

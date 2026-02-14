@@ -1,0 +1,540 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-end align-items-center mb-2">
+  <div>
+    <button id="exportImgBtn" class="btn btn-lg rounded-pill me-2"
+            style="background-color:#d0e8ff; color:#1760a5; transition:0.3s;">
+      匯出圖片
+    </button>
+    <button id="saveAllBtn" class="btn btn-lg rounded-pill"
+            style="background-color:#fcd2e7; color:rgb(13, 35, 107); transition:0.3s;">
+      儲存全部
+    </button>
+  </div>
+</div>
+
+<!-- 三個團隊欄位 -->
+<div class="row" id="teamsRow">
+  {% set teams = [
+    {"key": "紅塵拆塔", "label": "拆塔", "color": "#dc3545"},
+    {"key": "小崴大團", "label": "大團", "color": "#0d6efd"},
+    {"key": "步步機動", "label": "機動", "color": "#ffc107"}
+  ] %}
+  {% set team_names = ["第一隊","第二隊","第三隊","第四隊","第五隊"] %}
+
+  {% for team in teams %}
+  <div class="col-md-4 mb-2">
+    <div class="team-section" data-group="{{ team.key }}">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="fw-bold" style="color:{{ team.color }}; font-size:0.95em;">【{{ team.label }}】</span>
+        <div>
+          <button type="button" class="btn btn-outline-success add-group-btn py-0 px-1" style="font-size:0.75em;" data-group="{{ team.key }}" title="增加一組">+</button>
+          <button type="button" class="btn btn-outline-danger remove-group-btn py-0 px-1" style="font-size:0.75em;" data-group="{{ team.key }}" title="刪除最後一組">-</button>
+        </div>
+      </div>
+      <div class="groups-container" data-group="{{ team.key }}">
+        <!-- JS will render groups here -->
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- 待分配區 -->
+<div class="mt-4 mb-5">
+  <h5 class="mb-3" style="color:#1760a5; font-weight:bold;">待分配區</h5>
+  <div id="unassignedArea" class="team-slot unassigned-zone"
+       data-group="" data-team="">
+    <!-- JS will render unassigned player tags here -->
+  </div>
+</div>
+
+<script>
+(function() {
+  // ─── 資料定義 ─────────────────────────────────────────────
+  const GROUP_MAP = {
+    "紅塵拆塔": "拆塔",
+    "小崴大團": "大團",
+    "步步機動": "機動"
+  };
+  const GROUP_COLORS = {
+    "紅塵拆塔": "#dc3545",
+    "小崴大團": "#0d6efd",
+    "步步機動": "#ffc107"
+  };
+  const GROUP_BADGE_CLASS = {
+    "紅塵拆塔": "bg-danger",
+    "小崴大團": "bg-primary",
+    "步步機動": "bg-warning text-dark"
+  };
+  const TEAM_NAMES = ["第一隊","第二隊","第三隊","第四隊","第五隊"];
+  const TEAM_BADGE_CLASS = {
+    "第一隊": "bg-success",
+    "第二隊": "bg-info text-dark",
+    "第三隊": "bg-dark",
+    "第四隊": "bg-secondary",
+    "第五隊": "bg-warning text-dark"
+  };
+  const JOB_STYLES = {
+    "鐵衣": {"bg":"#FFD8A8","fg":"#000"},
+    "血河": {"bg":"#FFB3B3","fg":"#000"},
+    "碎夢": {"bg":"#B3E5FC","fg":"#000"},
+    "神相": {"bg":"#A7C7E7","fg":"#000"},
+    "九靈": {"bg":"#E1BEE7","fg":"#000"},
+    "玄機": {"bg":"#FFF59D","fg":"#000"},
+    "素問": {"bg":"#F8BBD0","fg":"#000"},
+    "龍吟": {"bg":"#C8E6C9","fg":"#000"}
+  };
+  const MAX_PER_GROUP = 6;
+
+  // ─── 載入玩家資料 ─────────────────────────────────────────
+  const allPlayers = [
+    {% for p in players %}
+    {
+      id: {{ p.id }},
+      name: "{{ p.player_name }}",
+      job: "{{ p.job }}",
+      can_fight: {{ "true" if p.can_fight else "false" }},
+      group_name: "{{ p.group_name or '' }}",
+      team_name: "{{ p.team_name or '' }}"
+    }{{ "," if not loop.last }}
+    {% endfor %}
+  ];
+
+  // 追蹤每個團隊目前幾組
+  const groupCounts = {
+    "紅塵拆塔": 1,
+    "小崴大團": 1,
+    "步步機動": 1
+  };
+
+  // ─── 初始化組數 ─────────────────────────────────────────
+  // 根據現有資料算出每個團隊需要幾組
+  allPlayers.forEach(function(p) {
+    if (p.group_name && p.team_name) {
+      var idx = TEAM_NAMES.indexOf(p.team_name);
+      if (idx >= 0 && groupCounts[p.group_name] !== undefined) {
+        groupCounts[p.group_name] = Math.max(groupCounts[p.group_name], idx + 1);
+      }
+    }
+  });
+
+  // ─── 建立玩家標籤（團隊區：只顯示名字 + 職業背景色）─────
+  function createTeamPlayerTag(player) {
+    var div = document.createElement("div");
+    div.className = "player-tag player-tag-team";
+    div.draggable = true;
+    div.dataset.playerId = player.id;
+
+    var jobStyle = JOB_STYLES[player.job] || {bg:"#ccc", fg:"#000"};
+    div.style.backgroundColor = jobStyle.bg;
+    div.style.color = jobStyle.fg;
+
+    if (!player.can_fight) {
+      div.classList.add("player-leave");
+    }
+
+    div.innerHTML = '<span class="fw-bold">' + player.name + '</span>';
+
+    addDragEvents(div, player.id);
+    return div;
+  }
+
+  // ─── 建立玩家標籤（待分配區：完整資訊）────────────────────
+  function createUnassignedPlayerTag(player) {
+    var div = document.createElement("div");
+    div.className = "player-tag player-tag-full";
+    div.draggable = true;
+    div.dataset.playerId = player.id;
+
+    if (!player.can_fight) {
+      div.classList.add("player-leave");
+    }
+
+    var jobStyle = JOB_STYLES[player.job] || {bg:"#ccc", fg:"#000"};
+    var groupBadge = "";
+    if (player.group_name && GROUP_BADGE_CLASS[player.group_name]) {
+      groupBadge = '<span class="badge rounded-pill ' + GROUP_BADGE_CLASS[player.group_name] + ' me-1">' + player.group_name + '</span>';
+    }
+    var teamBadge = "";
+    if (player.team_name && TEAM_BADGE_CLASS[player.team_name]) {
+      teamBadge = '<span class="badge rounded-pill ' + TEAM_BADGE_CLASS[player.team_name] + '">' + player.team_name + '</span>';
+    }
+
+    div.innerHTML =
+      '<div class="fw-bold">' + player.name + '</div>' +
+      '<div><span class="badge rounded-pill" style="background-color:' + jobStyle.bg + '; color:' + jobStyle.fg + ';">' + player.job + '</span></div>' +
+      '<div class="mt-1">' + groupBadge + teamBadge + '</div>';
+
+    addDragEvents(div, player.id);
+    return div;
+  }
+
+  // ─── 共用拖曳事件 ──────────────────────────────────────────
+  function addDragEvents(div, playerId) {
+    div.addEventListener("dragstart", function(e) {
+      e.dataTransfer.setData("text/plain", playerId.toString());
+      e.dataTransfer.effectAllowed = "move";
+      div.classList.add("dragging");
+    });
+    div.addEventListener("dragend", function(e) {
+      div.classList.remove("dragging");
+      // 拖到空白區域（非任何 drop zone）時，自動回到待分配區
+      if (e.dataTransfer.dropEffect === "none") {
+        var player = allPlayers.find(function(p) { return p.id === playerId; });
+        if (player && (player.group_name || player.team_name)) {
+          player.group_name = "";
+          player.team_name = "";
+          renderAll();
+        }
+      }
+    });
+  }
+
+  // ─── 建立空位元素 ─────────────────────────────────────────
+  function createEmptySlot() {
+    var div = document.createElement("div");
+    div.className = "empty-slot";
+    div.textContent = "空位";
+    return div;
+  }
+
+  // ─── 渲染單一組別的 drop zone ────────────────────────────
+  function renderGroupSlot(groupKey, teamIndex) {
+    var teamName = TEAM_NAMES[teamIndex];
+    var container = document.createElement("div");
+    container.className = "mb-1";
+
+    var label = document.createElement("div");
+    label.className = "text-center text-muted mb-0";
+    label.style.fontSize = "0.75em";
+    label.innerHTML = "── 組" + (teamIndex + 1) + " ──";
+    container.appendChild(label);
+
+    var slot = document.createElement("div");
+    slot.className = "team-slot";
+    slot.dataset.group = groupKey;
+    slot.dataset.team = teamName;
+    container.appendChild(slot);
+
+    // 放入屬於此組的玩家
+    var assigned = allPlayers.filter(function(p) {
+      return p.group_name === groupKey && p.team_name === teamName;
+    });
+    assigned.forEach(function(p) {
+      slot.appendChild(createTeamPlayerTag(p));
+    });
+
+    // Drop zone events
+    setupDropZone(slot);
+
+    return container;
+  }
+
+  // ─── 渲染某團隊所有組別 ──────────────────────────────────
+  function renderTeamGroups(groupKey) {
+    var container = document.querySelector('.groups-container[data-group="' + groupKey + '"]');
+    container.innerHTML = "";
+    for (var i = 0; i < groupCounts[groupKey]; i++) {
+      container.appendChild(renderGroupSlot(groupKey, i));
+    }
+  }
+
+  // ─── 渲染待分配區 ────────────────────────────────────────
+  function renderUnassigned() {
+    var area = document.getElementById("unassignedArea");
+    area.innerHTML = "";
+    var unassigned = allPlayers.filter(function(p) {
+      return !p.group_name || !p.team_name;
+    });
+    if (unassigned.length === 0) {
+      area.innerHTML = '<div class="text-muted fst-italic p-3">所有玩家皆已分配</div>';
+    } else {
+      unassigned.forEach(function(p) {
+        area.appendChild(createUnassignedPlayerTag(p));
+      });
+    }
+  }
+
+  // ─── 設定 drop zone ──────────────────────────────────────
+  function setupDropZone(zone) {
+    zone.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      zone.classList.add("drag-over");
+    });
+    zone.addEventListener("dragleave", function() {
+      zone.classList.remove("drag-over");
+    });
+    zone.addEventListener("drop", function(e) {
+      e.preventDefault();
+      zone.classList.remove("drag-over");
+
+      var playerId = parseInt(e.dataTransfer.getData("text/plain"));
+      var targetGroup = zone.dataset.group;
+      var targetTeam = zone.dataset.team;
+
+      // 請假玩家不能拖入團隊格子
+      var player = allPlayers.find(function(p) { return p.id === playerId; });
+      if (targetGroup && targetTeam && player && !player.can_fight) {
+        return;
+      }
+
+      // 如果是團隊格子，檢查人數上限
+      if (targetGroup && targetTeam) {
+        var currentCount = allPlayers.filter(function(p) {
+          return p.group_name === targetGroup && p.team_name === targetTeam;
+        }).length;
+        // 如果玩家已經在此格子，不算新增
+        var player = allPlayers.find(function(p) { return p.id === playerId; });
+        if (player && (player.group_name !== targetGroup || player.team_name !== targetTeam)) {
+          if (currentCount >= MAX_PER_GROUP) {
+            alert("此組已滿（最多 " + MAX_PER_GROUP + " 人）");
+            return;
+          }
+        }
+      }
+
+      // 更新前端資料
+      var player = allPlayers.find(function(p) { return p.id === playerId; });
+      if (player) {
+        player.group_name = targetGroup || "";
+        player.team_name = targetTeam || "";
+      }
+
+      // 重新渲染全部
+      renderAll();
+    });
+  }
+
+  // ─── 渲染全部 ────────────────────────────────────────────
+  function renderAll() {
+    Object.keys(groupCounts).forEach(function(gk) {
+      renderTeamGroups(gk);
+    });
+    renderUnassigned();
+    setupUnassignedDropZone();
+  }
+
+  // ─── 待分配區 drop zone ──────────────────────────────────
+  function setupUnassignedDropZone() {
+    var area = document.getElementById("unassignedArea");
+    // 移除舊事件（透過 clone 替換）
+    var newArea = area.cloneNode(true);
+    area.parentNode.replaceChild(newArea, area);
+
+    // 重新加 drag events 到所有 player tags
+    newArea.querySelectorAll(".player-tag").forEach(function(tag) {
+      var pid = parseInt(tag.dataset.playerId);
+      tag.addEventListener("dragstart", function(e) {
+        e.dataTransfer.setData("text/plain", pid.toString());
+        e.dataTransfer.effectAllowed = "move";
+        tag.classList.add("dragging");
+      });
+      tag.addEventListener("dragend", function() {
+        tag.classList.remove("dragging");
+      });
+    });
+
+    newArea.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      newArea.classList.add("drag-over");
+    });
+    newArea.addEventListener("dragleave", function() {
+      newArea.classList.remove("drag-over");
+    });
+    newArea.addEventListener("drop", function(e) {
+      e.preventDefault();
+      newArea.classList.remove("drag-over");
+
+      var playerId = parseInt(e.dataTransfer.getData("text/plain"));
+      var player = allPlayers.find(function(p) { return p.id === playerId; });
+      if (player) {
+        player.group_name = "";
+        player.team_name = "";
+      }
+      renderAll();
+    });
+  }
+
+  // ─── +/- 按鈕 ────────────────────────────────────────────
+  document.querySelectorAll(".add-group-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var gk = this.dataset.group;
+      if (groupCounts[gk] < 5) {
+        groupCounts[gk]++;
+        renderTeamGroups(gk);
+      } else {
+        alert("最多 5 組");
+      }
+    });
+  });
+
+  document.querySelectorAll(".remove-group-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var gk = this.dataset.group;
+      if (groupCounts[gk] <= 1) {
+        alert("至少保留 1 組");
+        return;
+      }
+      var lastTeam = TEAM_NAMES[groupCounts[gk] - 1];
+      var inGroup = allPlayers.filter(function(p) {
+        return p.group_name === gk && p.team_name === lastTeam;
+      });
+      if (inGroup.length > 0) {
+        if (!confirm("組" + groupCounts[gk] + " 裡有 " + inGroup.length + " 名玩家，刪除後將移回待分配區，確定嗎？")) {
+          return;
+        }
+        inGroup.forEach(function(p) {
+          p.group_name = "";
+          p.team_name = "";
+        });
+      }
+      groupCounts[gk]--;
+      renderAll();
+    });
+  });
+
+  // ─── 儲存 ────────────────────────────────────────────────
+  document.getElementById("saveAllBtn").addEventListener("click", function() {
+    var assignments = allPlayers.map(function(p) {
+      return {
+        id: p.id,
+        group_name: p.group_name || "",
+        team_name: p.team_name || ""
+      };
+    });
+
+    fetch("/team_assign_update", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({assignments: assignments})
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.status === "success") {
+        alert("儲存成功！");
+      } else {
+        alert("儲存失敗：" + (data.message || "未知錯誤"));
+      }
+    })
+    .catch(function(err) {
+      alert("儲存失敗：" + err);
+    });
+  });
+
+  // 儲存按鈕 hover
+  var saveBtn = document.getElementById("saveAllBtn");
+  saveBtn.addEventListener("mouseover", function() {
+    this.style.backgroundColor = "#f7a9c4";
+  });
+  saveBtn.addEventListener("mouseout", function() {
+    this.style.backgroundColor = "#fcd2e7";
+  });
+
+  // 匯出圖片按鈕 hover
+  var exportBtn = document.getElementById("exportImgBtn");
+  exportBtn.addEventListener("mouseover", function() {
+    this.style.backgroundColor = "#a8d4ff";
+  });
+  exportBtn.addEventListener("mouseout", function() {
+    this.style.backgroundColor = "#d0e8ff";
+  });
+
+  // ─── 匯出圖片 ────────────────────────────────────────────
+  document.getElementById("exportImgBtn").addEventListener("click", function() {
+    var GROUPS = ["紅塵拆塔","小崴大團","步步機動"];
+    var GROUP_LABELS = {"紅塵拆塔":"拆塔","小崴大團":"大團","步步機動":"機動"};
+
+    // 建立離屏容器
+    var wrap = document.createElement("div");
+    wrap.style.cssText = "position:fixed;left:-9999px;top:0;width:900px;padding:20px 24px;background:#f8f9fa;font-family:'Microsoft JhengHei',sans-serif;";
+
+    // 三欄容器
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:12px;";
+    wrap.appendChild(row);
+
+    GROUPS.forEach(function(gk) {
+      var col = document.createElement("div");
+      col.style.cssText = "flex:1;background:#fff;border-radius:6px;padding:8px 10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);";
+
+      // 團隊標題
+      var header = document.createElement("div");
+      header.style.cssText = "font-weight:bold;font-size:14px;color:" + GROUP_COLORS[gk] + ";margin-bottom:6px;";
+      header.textContent = "【" + GROUP_LABELS[gk] + "】";
+      col.appendChild(header);
+
+      for (var ti = 0; ti < groupCounts[gk]; ti++) {
+        var teamName = TEAM_NAMES[ti];
+        // 組別標籤
+        var lbl = document.createElement("div");
+        lbl.style.cssText = "text-align:center;color:#6c757d;font-size:11px;margin:4px 0 2px;";
+        lbl.textContent = "── 組" + (ti + 1) + " ──";
+        col.appendChild(lbl);
+
+        // 格子
+        var slot = document.createElement("div");
+        slot.style.cssText = "border:1px dashed #ccc;border-radius:6px;padding:3px;display:flex;flex-direction:column;gap:2px;min-height:24px;";
+
+        var members = allPlayers.filter(function(p) {
+          return p.group_name === gk && p.team_name === teamName && p.can_fight;
+        });
+        members.forEach(function(p) {
+          var tag = document.createElement("div");
+          var js = JOB_STYLES[p.job] || {bg:"#ccc",fg:"#000"};
+          tag.style.cssText = "background:" + js.bg + ";color:" + js.fg + ";padding:2px 8px;border-radius:4px;font-size:12px;font-weight:bold;text-align:center;";
+          tag.textContent = p.name;
+          slot.appendChild(tag);
+        });
+
+        col.appendChild(slot);
+      }
+      row.appendChild(col);
+    });
+
+    // 候補區（排除請假玩家）
+    var unassigned = allPlayers.filter(function(p) {
+      return (!p.group_name || !p.team_name) && p.can_fight;
+    });
+    if (unassigned.length > 0) {
+      var subTitle = document.createElement("div");
+      subTitle.style.cssText = "font-size:16px;font-weight:bold;color:#1760a5;margin:16px 0 8px;";
+      subTitle.textContent = "候補區";
+      wrap.appendChild(subTitle);
+
+      var grid = document.createElement("div");
+      grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;";
+
+      unassigned.forEach(function(p) {
+        var tag = document.createElement("div");
+        var js = JOB_STYLES[p.job] || {bg:"#ccc",fg:"#000"};
+        tag.style.cssText = "background:" + js.bg + ";color:" + js.fg + ";padding:4px 8px;border-radius:6px;text-align:center;font-size:12px;font-weight:bold;border:1px solid #dee2e6;";
+        if (!p.can_fight) tag.style.opacity = "0.5";
+        tag.textContent = p.name;
+        grid.appendChild(tag);
+      });
+      wrap.appendChild(grid);
+    }
+
+    document.body.appendChild(wrap);
+
+    html2canvas(wrap, {scale: 2, backgroundColor: "#f8f9fa"}).then(function(canvas) {
+      document.body.removeChild(wrap);
+      var link = document.createElement("a");
+      link.download = "團隊編成.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }).catch(function() {
+      document.body.removeChild(wrap);
+      alert("匯出圖片失敗");
+    });
+  });
+
+  // ─── 初始渲染 ────────────────────────────────────────────
+  renderAll();
+})();
+</script>
+{% endblock %}

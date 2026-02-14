@@ -96,14 +96,102 @@ h2, h1 {
     color: #343a40;
 }
 
-.navbar .nav-link {
-    color: #f8f9fa !important;
-    transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+/* ─── 團隊編成：團隊區塊 ─── */
+.team-section {
+    background-color: #fff;
+    border-radius: 6px;
+    padding: 8px 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 
-.navbar .nav-link:hover {
-    color: #ffc107 !important; /* hover 時文字變金黃色 */
-    background-color: rgba(255, 255, 255, 0.1); /* hover 時背景淡亮 */
+/* ─── 團隊編成：Drop Zone ─── */
+.team-slot {
+    min-height: 32px;
+    border: 1px dashed #ccc;
+    border-radius: 6px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.team-slot.drag-over {
+    border-color: #0d6efd;
+    background-color: #e7f1ff;
+}
+
+/* ─── 團隊編成：待分配區 ─── */
+.unassigned-zone {
+    min-height: 100px;
+    border: 2px dashed #adb5bd;
+    border-radius: 8px;
+    padding: 12px;
+    background-color: #fff;
+}
+
+.unassigned-zone.drag-over {
+    border-color: #198754;
+    background-color: #e8f5e9;
+}
+
+/* ─── 團隊編成：玩家標籤（共用） ─── */
+.player-tag {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    cursor: grab;
+    transition: box-shadow 0.2s, transform 0.15s;
+    user-select: none;
+}
+
+.player-tag:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.player-tag.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+
+/* 團隊區標籤：精簡，只有名字 + 職業背景色 */
+.player-tag-team {
+    padding: 2px 8px;
+    text-align: center;
+    font-size: 0.82em;
     border-radius: 4px;
+    line-height: 1.3;
 }
 
+/* 待分配區標籤：完整資訊卡片 */
+.player-tag-full {
+    background-color: #fff;
+    padding: 8px 12px;
+    min-width: 120px;
+    white-space: nowrap;
+}
+
+/* 請假玩家灰色半透明 */
+.player-tag.player-leave {
+    opacity: 0.5;
+    background-color: #e9ecef !important;
+    border-color: #adb5bd;
+}
+
+/* ─── 團隊編成：待分配區多欄並排 ─── */
+.unassigned-zone {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+}
+
+/* ─── 團隊編成：空位提示 ─── */
+.empty-slot {
+    border: 1px dashed #dee2e6;
+    border-radius: 4px;
+    padding: 1px 8px;
+    text-align: center;
+    color: #adb5bd;
+    font-size: 0.78em;
+    line-height: 1.3;
+}
