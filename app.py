@@ -25,6 +25,7 @@ class Player(db.Model):
     group_name = db.Column(db.String(50))
     team_name = db.Column(db.String(50))
     role_note = db.Column(db.String(100))
+    skill = db.Column(db.String(50))
 
 # 首頁：大表格顯示 + 職業統計
 @app.route('/')
@@ -156,6 +157,7 @@ def team_assign_update():
         if player:
             player.group_name = item.get('group_name') or None
             player.team_name = item.get('team_name') or None
+            player.skill = item.get('skill') or None
 
     db.session.commit()
     return jsonify({"status": "success"})
@@ -171,6 +173,7 @@ def export_all():
         "隊伍": p.team_name,
         "名字": p.player_name,
         "職業": p.job,
+        "絕技": p.skill,
         "備註": p.role_note,
         "狀態": "能打" if p.can_fight else "請假"
     } for p in players]
