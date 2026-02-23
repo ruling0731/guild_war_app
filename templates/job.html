@@ -7,6 +7,7 @@
     <thead style="background-color:#fcd2e7; color:rgb(13, 35, 107);">
       <tr>
         <th>名字</th>
+        <th>標籤</th>
         <th>分組</th>
         <th>隊伍</th>
         <th>狀態</th>
@@ -18,6 +19,26 @@
       <tr>
         <!-- 名字 -->
         <td><span class="fw-bold text-primary">{{ player.player_name }}</span></td>
+
+        <!-- 幫眾 / 約戰 標籤勾選 -->
+        <td>
+          <div class="d-flex flex-column gap-1 align-items-center">
+            <div class="form-check mb-0">
+              <input type="checkbox" class="form-check-input" name="is_guild_{{ player.id }}"
+                     id="ig_{{ player.id }}" {% if player.is_guild %}checked{% endif %}>
+              <label class="form-check-label" for="ig_{{ player.id }}">
+                <span class="badge bg-success" style="font-size:0.7em;">幫眾</span>
+              </label>
+            </div>
+            <div class="form-check mb-0">
+              <input type="checkbox" class="form-check-input" name="is_challenge_{{ player.id }}"
+                     id="ic_{{ player.id }}" {% if player.is_challenge %}checked{% endif %}>
+              <label class="form-check-label" for="ic_{{ player.id }}">
+                <span class="badge bg-danger" style="font-size:0.7em;">約戰</span>
+              </label>
+            </div>
+          </div>
+        </td>
 
         <!-- 分組顏色標籤 + 下拉 -->
         <td>

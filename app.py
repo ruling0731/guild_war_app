@@ -26,6 +26,45 @@ class Player(db.Model):
     team_name = db.Column(db.String(50))
     role_note = db.Column(db.String(100))
     skill = db.Column(db.String(50))
+    is_guild = db.Column(db.Boolean, default=False)
+    is_challenge = db.Column(db.Boolean, default=False)
+    challenge_group_name = db.Column(db.String(50))
+    challenge_team_name = db.Column(db.String(50))
+    challenge_skill = db.Column(db.String(50))
+
+# 團隊編成小隊名稱設定表
+class TeamConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    group_name = db.Column(db.String(50), nullable=False)
+    slot_index = db.Column(db.Integer, nullable=False)
+    display_name = db.Column(db.String(50), nullable=False)
+    __table_args__ = (db.UniqueConstraint('group_name', 'slot_index', name='uq_team_config_group_slot'),)
+
+# 約戰小隊名稱設定表
+class ChallengeTeamConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    group_name = db.Column(db.String(50), nullable=False)
+    slot_index = db.Column(db.Integer, nullable=False)
+    display_name = db.Column(db.String(50), nullable=False)
+    __table_args__ = (db.UniqueConstraint('group_name', 'slot_index', name='uq_challenge_tc_group_slot'),)
+
+with app.app_context():
+    db.create_all()
+    # 為既有資料庫補上新欄位（SQLite 不支援 ALTER TABLE ADD COLUMN IF NOT EXISTS）
+    with db.engine.connect() as conn:
+        inspector = db.inspect(db.engine)
+        player_cols = [c['name'] for c in inspector.get_columns('player')]
+        new_cols = [
+            ('is_guild',            'ALTER TABLE player ADD COLUMN is_guild BOOLEAN DEFAULT 0'),
+            ('is_challenge',        'ALTER TABLE player ADD COLUMN is_challenge BOOLEAN DEFAULT 0'),
+            ('challenge_group_name','ALTER TABLE player ADD COLUMN challenge_group_name VARCHAR(50)'),
+            ('challenge_team_name', 'ALTER TABLE player ADD COLUMN challenge_team_name VARCHAR(50)'),
+            ('challenge_skill',     'ALTER TABLE player ADD COLUMN challenge_skill VARCHAR(50)'),
+        ]
+        for col, ddl in new_cols:
+            if col not in player_cols:
+                conn.execute(db.text(ddl))
+        conn.commit()
 
 # 首頁：大表格顯示 + 職業統計
 @app.route('/')
@@ -56,13 +95,13 @@ def add_player():
     name = request.form.get('name')
     job = request.form.get('job')
     leave = request.form.get('leave')
-    group_name = request.form.get('group_name')
-    team_name = request.form.get('team_name')
     role_note = request.form.get('role_note')
+    is_guild = bool(request.form.get('is_guild'))
+    is_challenge = bool(request.form.get('is_challenge'))
     can_fight = False if leave else True
 
     new_player = Player(player_name=name, job=job, can_fight=can_fight,
-                        group_name=group_name, team_name=team_name, role_note=role_note)
+                        role_note=role_note, is_guild=is_guild, is_challenge=is_challenge)
     db.session.add(new_player)
     db.session.commit()
     return jsonify({"status": "success"})
@@ -116,6 +155,8 @@ def job_page(job):
             player.group_name = request.form.get(f"group_name_{player.id}") or None
             player.team_name = request.form.get(f"team_name_{player.id}") or None
             player.role_note = request.form.get(f"role_note_{player.id}") or None
+            player.is_guild = bool(request.form.get(f"is_guild_{player.id}"))
+            player.is_challenge = bool(request.form.get(f"is_challenge_{player.id}"))
         db.session.commit()
         return redirect(url_for('job_page', job=job))
 
@@ -130,36 +171,92 @@ def job_detail(id):
         player.group_name = request.form.get('group_name')
         player.team_name = request.form.get('team_name')
         player.role_note = request.form.get('role_note')
-        # 更新能打/請假
-        can_fight_val = request.form.get('can_fight')
-        player.can_fight = True if can_fight_val == "true" else False
+        player.is_guild = bool(request.form.get('is_guild'))
+        player.is_challenge = bool(request.form.get('is_challenge'))
 
         db.session.commit()
         return redirect(url_for('job_page', job=player.job))
 
     return render_template('job_detail.html', player=player)
 
-# 團隊編成頁面
+def _build_team_name_configs(config_model):
+    configs = config_model.query.all()
+    result = {}
+    for c in configs:
+        if c.group_name not in result:
+            result[c.group_name] = {}
+        result[c.group_name][c.slot_index] = c.display_name
+    return result
+
+# 團隊編成頁面（只顯示幫眾）
 @app.route('/team_assign')
 def team_assign():
-    players = Player.query.all()
-    return render_template('team_assign.html', players=players)
+    players_data = [
+        {"id": p.id, "name": p.player_name, "job": p.job, "can_fight": p.can_fight,
+         "group_name": p.group_name or "", "team_name": p.team_name or "", "skill": p.skill or ""}
+        for p in Player.query.filter_by(is_guild=True).all()
+    ]
+    return render_template('team_assign.html',
+                           players=players_data,
+                           team_name_configs=_build_team_name_configs(TeamConfig),
+                           save_url='/team_assign_update',
+                           page_title='團隊編成')
+
+# 約戰頁面（只顯示約戰成員）
+@app.route('/challenge_assign')
+def challenge_assign():
+    players_data = [
+        {"id": p.id, "name": p.player_name, "job": p.job, "can_fight": p.can_fight,
+         "group_name": p.challenge_group_name or "", "team_name": p.challenge_team_name or "", "skill": p.challenge_skill or ""}
+        for p in Player.query.filter_by(is_challenge=True).all()
+    ]
+    return render_template('team_assign.html',
+                           players=players_data,
+                           team_name_configs=_build_team_name_configs(ChallengeTeamConfig),
+                           save_url='/challenge_assign_update',
+                           page_title='約戰')
+
+def _save_assign_update(data, player_fields, config_model):
+    for item in data.get('assignments', []):
+        player = Player.query.get(item['id'])
+        if player:
+            setattr(player, player_fields['group'], item.get('group_name') or None)
+            setattr(player, player_fields['team'],  item.get('team_name')  or None)
+            setattr(player, player_fields['skill'], item.get('skill')      or None)
+    for cfg in data.get('team_configs', []):
+        existing = config_model.query.filter_by(
+            group_name=cfg['group_name'], slot_index=cfg['slot_index']
+        ).first()
+        if existing:
+            existing.display_name = cfg['display_name']
+        else:
+            db.session.add(config_model(
+                group_name=cfg['group_name'],
+                slot_index=cfg['slot_index'],
+                display_name=cfg['display_name']
+            ))
+    db.session.commit()
 
 # 團隊編成儲存 API
 @app.route('/team_assign_update', methods=['POST'])
 def team_assign_update():
     data = request.get_json()
-    if not data or 'assignments' not in data:
+    if not data:
         return jsonify({"status": "error", "message": "無效的資料格式"}), 400
+    _save_assign_update(data,
+                        {'group': 'group_name', 'team': 'team_name', 'skill': 'skill'},
+                        TeamConfig)
+    return jsonify({"status": "success"})
 
-    for item in data['assignments']:
-        player = Player.query.get(item['id'])
-        if player:
-            player.group_name = item.get('group_name') or None
-            player.team_name = item.get('team_name') or None
-            player.skill = item.get('skill') or None
-
-    db.session.commit()
+# 約戰儲存 API
+@app.route('/challenge_assign_update', methods=['POST'])
+def challenge_assign_update():
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "error", "message": "無效的資料格式"}), 400
+    _save_assign_update(data,
+                        {'group': 'challenge_group_name', 'team': 'challenge_team_name', 'skill': 'challenge_skill'},
+                        ChallengeTeamConfig)
     return jsonify({"status": "success"})
 
 # 匯出 Excel
