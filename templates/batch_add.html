@@ -10,7 +10,7 @@
   </div>
 
   <div class="alert alert-info">
-    可用職業：鐵衣、血河、碎夢、神相、九靈、玄機、素問、龍吟
+    可用職業：{{ all_jobs | map(attribute='name') | join('、') }}
   </div>
 
   <div id="errorBox" class="alert alert-danger d-none"></div>
@@ -22,7 +22,7 @@
 document.getElementById("batchForm").addEventListener("submit", function(event){
   var textarea = document.getElementById("players");
   var lines = textarea.value.trim().split("\n");
-  var validJobs = ["鐵衣","血河","碎夢","神相","九靈","玄機","素問","龍吟"];
+  var validJobs = {{ all_jobs | map(attribute='name') | list | tojson }};
   var errors = [];
 
   lines.forEach(function(line, idx){

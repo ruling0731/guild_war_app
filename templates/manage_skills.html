@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 style="color:#1760a5; font-weight:bold; margin:0;">技能管理</h5>
+  <button class="btn btn-primary btn-sm rounded-pill px-3"
+          data-bs-toggle="modal" data-bs-target="#addSkillModal">
+    + 新增技能
+  </button>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle" id="skillsTable">
+    <thead class="table-light">
+      <tr>
+        <th>#</th>
+        <th>技能名稱</th>
+        <th style="width:140px;">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for skill in all_skills %}
+      <tr id="skill-row-{{ skill.id }}">
+        <td class="text-muted" style="font-size:0.85em;">{{ loop.index }}</td>
+        <td class="fw-bold">{{ skill.name }}</td>
+        <td>
+          <button class="btn btn-outline-primary btn-sm me-1 edit-skill-btn"
+                  data-id="{{ skill.id }}" data-name="{{ skill.name }}"
+                  data-bs-toggle="modal" data-bs-target="#editSkillModal">
+            編輯
+          </button>
+          <button class="btn btn-outline-danger btn-sm delete-skill-btn"
+                  data-id="{{ skill.id }}" data-name="{{ skill.name }}">
+            刪除
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- 新增技能 Modal -->
+<div class="modal fade" id="addSkillModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">新增技能</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">技能名稱</label>
+          <input type="text" class="form-control" id="addSkillName" placeholder="例：流風輕雲(奶絕)">
+        </div>
+        <div id="addSkillError" class="text-danger"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="addSkillSubmit">新增</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 編輯技能 Modal -->
+<div class="modal fade" id="editSkillModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">編輯技能</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editSkillId">
+        <div class="mb-3">
+          <label class="form-label">技能名稱</label>
+          <input type="text" class="form-control" id="editSkillName">
+        </div>
+        <div id="editSkillError" class="text-danger"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="editSkillSubmit">儲存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var skillRowCount = document.querySelectorAll('#skillsTable tbody tr').length;
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildSkillRowHTML(skill, index) {
+  return `
+    <td class="text-muted" style="font-size:0.85em;">${index}</td>
+    <td class="fw-bold">${escHtml(skill.name)}</td>
+    <td>
+      <button class="btn btn-outline-primary btn-sm me-1 edit-skill-btn"
+              data-id="${skill.id}" data-name="${escHtml(skill.name)}"
+              data-bs-toggle="modal" data-bs-target="#editSkillModal">編輯</button>
+      <button class="btn btn-outline-danger btn-sm delete-skill-btn"
+              data-id="${skill.id}" data-name="${escHtml(skill.name)}">刪除</button>
+    </td>
+  `;
+}
+
+function bindSkillRowEvents(tr) {
+  tr.querySelector('.edit-skill-btn').addEventListener('click', openEditSkillModal);
+  tr.querySelector('.delete-skill-btn').addEventListener('click', deleteSkill);
+}
+
+// ── 新增技能 ──────────────────────────────────────
+document.getElementById('addSkillSubmit').addEventListener('click', function() {
+  var name = document.getElementById('addSkillName').value.trim();
+  document.getElementById('addSkillError').textContent = '';
+  if (!name) { document.getElementById('addSkillError').textContent = '技能名稱不能為空'; return; }
+
+  fetch('/api/skills', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name})
+  }).then(r => r.json()).then(function(data) {
+    if (data.status === 'success') {
+      skillRowCount++;
+      var tbody = document.querySelector('#skillsTable tbody');
+      var tr = document.createElement('tr');
+      tr.id = 'skill-row-' + data.id;
+      tr.innerHTML = buildSkillRowHTML(data, skillRowCount);
+      tbody.appendChild(tr);
+      bindSkillRowEvents(tr);
+      document.getElementById('addSkillName').value = '';
+      bootstrap.Modal.getInstance(document.getElementById('addSkillModal')).hide();
+    } else {
+      document.getElementById('addSkillError').textContent = data.message || '新增失敗';
+    }
+  });
+});
+
+// ── 編輯技能 ──────────────────────────────────────
+function openEditSkillModal() {
+  document.getElementById('editSkillId').value   = this.dataset.id;
+  document.getElementById('editSkillName').value = this.dataset.name;
+  document.getElementById('editSkillError').textContent = '';
+}
+document.querySelectorAll('.edit-skill-btn').forEach(function(btn){
+  btn.addEventListener('click', openEditSkillModal);
+});
+
+document.getElementById('editSkillSubmit').addEventListener('click', function() {
+  var id   = document.getElementById('editSkillId').value;
+  var name = document.getElementById('editSkillName').value.trim();
+  document.getElementById('editSkillError').textContent = '';
+  if (!name) { document.getElementById('editSkillError').textContent = '技能名稱不能為空'; return; }
+
+  fetch('/api/skills/' + id, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name})
+  }).then(r => r.json()).then(function(data) {
+    if (data.status === 'success') {
+      var tr = document.getElementById('skill-row-' + id);
+      var index = tr.querySelector('td').textContent.trim();
+      tr.innerHTML = buildSkillRowHTML(data, index);
+      bindSkillRowEvents(tr);
+      bootstrap.Modal.getInstance(document.getElementById('editSkillModal')).hide();
+    } else {
+      document.getElementById('editSkillError').textContent = data.message || '儲存失敗';
+    }
+  });
+});
+
+// ── 刪除技能 ──────────────────────────────────────
+function deleteSkill() {
+  var id   = this.dataset.id;
+  var name = this.dataset.name;
+  if (!confirm('確定要刪除技能「' + name + '」嗎？')) return;
+  fetch('/api/skills/' + id + '/delete', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'}
+  }).then(r => r.json()).then(function(data) {
+    if (data.status === 'success') {
+      document.getElementById('skill-row-' + id).remove();
+      // 重新編號
+      var rows = document.querySelectorAll('#skillsTable tbody tr');
+      rows.forEach(function(row, i) {
+        row.cells[0].textContent = i + 1;
+      });
+    } else {
+      alert('刪除失敗：' + (data.message || '未知錯誤'));
+    }
+  });
+}
+document.querySelectorAll('.delete-skill-btn').forEach(function(btn){
+  btn.addEventListener('click', deleteSkill);
+});
+</script>
+{% endblock %}

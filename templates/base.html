@@ -62,18 +62,22 @@ document.getElementById("backToTop").addEventListener("mouseout", function(){
             職業分頁
           </a>
           <ul class="dropdown-menu" aria-labelledby="jobDropdown">
-            <li><a class="dropdown-item" href="/job/鐵衣">鐵衣</a></li>
-            <li><a class="dropdown-item" href="/job/血河">血河</a></li>
-            <li><a class="dropdown-item" href="/job/碎夢">碎夢</a></li>
-            <li><a class="dropdown-item" href="/job/神相">神相</a></li>
-            <li><a class="dropdown-item" href="/job/九靈">九靈</a></li>
-            <li><a class="dropdown-item" href="/job/玄機">玄機</a></li>
-            <li><a class="dropdown-item" href="/job/素問">素問</a></li>
-            <li><a class="dropdown-item" href="/job/龍吟">龍吟</a></li>
+            {% for job in all_jobs %}
+            <li><a class="dropdown-item" href="/job/{{ job.name }}">{{ job.name }}</a></li>
+            {% endfor %}
           </ul>
         </li>
         <li class="nav-item"><a class="nav-link" href="/team_assign">團隊編成</a></li>
         <li class="nav-item"><a class="nav-link" href="/challenge_assign">約戰</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="manageDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            管理
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="manageDropdown">
+            <li><a class="dropdown-item" href="/manage_jobs">職業管理</a></li>
+            <li><a class="dropdown-item" href="/manage_skills">技能管理</a></li>
+          </ul>
+        </li>
         <li class="nav-item"><a class="nav-link" href="/export_all">匯出 Excel</a></li>
       </ul>
     </div>
@@ -81,17 +85,6 @@ document.getElementById("backToTop").addEventListener("mouseout", function(){
 </nav>
 
 <div class="container">
-  {% set job_styles = {
-    "鐵衣": {"bg":"#FFD8A8", "fg":"#000"},
-    "血河": {"bg":"#FFB3B3", "fg":"#000"},
-    "碎夢": {"bg":"#B3E5FC", "fg":"#000"},
-    "神相": {"bg":"#A7C7E7", "fg":"#000"},
-    "九靈": {"bg":"#E1BEE7", "fg":"#000"},
-    "玄機": {"bg":"#FFF59D", "fg":"#000"},
-    "素問": {"bg":"#F8BBD0", "fg":"#000"},
-    "龍吟": {"bg":"#C8E6C9", "fg":"#000"}
-  } %}
-  
   {% block content %}{% endblock %}
 </div>
 

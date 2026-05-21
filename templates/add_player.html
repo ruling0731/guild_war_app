@@ -12,14 +12,9 @@
     <label for="job" class="form-label">職業</label>
     <select class="form-select" name="job" required>
       <option value="">請選擇</option>
-      <option value="鐵衣">鐵衣</option>
-      <option value="血河">血河</option>
-      <option value="碎夢">碎夢</option>
-      <option value="神相">神相</option>
-      <option value="九靈">九靈</option>
-      <option value="玄機">玄機</option>
-      <option value="素問">素問</option>
-      <option value="龍吟">龍吟</option>
+      {% for job in all_jobs %}
+      <option value="{{ job.name }}">{{ job.name }}</option>
+      {% endfor %}
     </select>
   </div>
 

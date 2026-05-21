@@ -78,40 +78,8 @@
     "第四隊": "bg-secondary",
     "第五隊": "bg-warning text-dark"
   };
-  const JOB_STYLES = {
-    "鐵衣": {"bg":"#FFD8A8","fg":"#000"},
-    "血河": {"bg":"#FFB3B3","fg":"#000"},
-    "碎夢": {"bg":"#B3E5FC","fg":"#000"},
-    "神相": {"bg":"#A7C7E7","fg":"#000"},
-    "九靈": {"bg":"#E1BEE7","fg":"#000"},
-    "玄機": {"bg":"#FFF59D","fg":"#000"},
-    "素問": {"bg":"#F8BBD0","fg":"#000"},
-    "龍吟": {"bg":"#C8E6C9","fg":"#000"}
-  };
-  const SKILLS = [
-    "流風輕雲(奶絕)",
-    "鈞天浩意(砲)",
-    "法天象地",
-    "蝶舞清夢",
-    "劍魂沖銷",
-    "大鬧天宮",
-    "騰龍越淵",
-    "九天雷引",
-    "冰火絕滅",
-    "劍破乾坤",
-    "太極圖",
-    "萬劍訣",
-    "奪破寶典",
-    "紅蓮焚夜",
-    "狂發一怒",
-    "殘心三絕劍",
-    "繁花一夢",
-    "長歌獻君",
-    "蓋世訣",
-    "天下無狗",
-    "春華佑世",
-    "昀光神劍"
-  ];
+  const JOB_STYLES = {{ job_styles | tojson }};
+  const SKILLS = {{ skills | tojson }};
   const MAX_PER_GROUP = 6;
 
   // ─── 從伺服器載入小隊名稱設定 ───────────────────────────────
@@ -138,6 +106,10 @@
 
   // ─── 載入玩家資料 ─────────────────────────────────────────
   const allPlayers = {{ players | tojson }};
+  // 將 "|" 分隔的技能字串解析為陣列
+  allPlayers.forEach(function(p) {
+    p.skills = p.skill ? p.skill.split("|").filter(Boolean) : [];
+  });
 
   // 追蹤每個團隊目前幾組
   const groupCounts = {
@@ -156,19 +128,80 @@
     }
   });
 
-  // ─── 建立絕技下拉選單 HTML ─────────────────────────────────
-  function buildSkillSelect(playerId, currentSkill) {
-    var html = '<select class="skill-select" data-player-id="' + playerId + '">';
-    html += '<option value="">攜帶絕技</option>';
-    SKILLS.forEach(function(sk) {
-      var selected = (sk === currentSkill) ? ' selected' : '';
-      html += '<option value="' + sk + '"' + selected + '>' + sk + '</option>';
+  // ─── 關閉所有技能下拉（從 body 移除）────────────────────
+  function closeAllDropdowns() {
+    document.querySelectorAll("body > .skill-multi-dropdown").forEach(function(d) {
+      d.style.display = "none";
+      document.body.removeChild(d);
     });
-    html += '</select>';
-    return html;
   }
 
-  // ─── 建立玩家標籤（團隊區：名字 | 絕技下拉）─────────────
+  // ─── 建立多技能勾選下拉 ──────────────────────────────────
+  function buildSkillMultiSelect(player, div) {
+    var wrapper = document.createElement("div");
+    wrapper.className = "skill-multi-wrapper";
+
+    var display = document.createElement("span");
+    display.className = "skill-multi-display";
+    display.textContent = player.skills.length ? player.skills.join(", ") : "攜帶絕技";
+
+    var arrowSpan = document.createElement("span");
+    arrowSpan.className = "skill-drop-arrow";
+    arrowSpan.textContent = "▾";
+
+    var clickTarget = document.createElement("span");
+    clickTarget.className = "skill-multi-click-target";
+    clickTarget.appendChild(display);
+    clickTarget.appendChild(arrowSpan);
+
+    var dropdown = document.createElement("div");
+    dropdown.className = "skill-multi-dropdown";
+
+    SKILLS.forEach(function(sk) {
+      var label = document.createElement("label");
+      label.className = "skill-checkbox-label";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = sk;
+      cb.checked = player.skills.indexOf(sk) >= 0;
+      cb.addEventListener("change", function(e) {
+        e.stopPropagation();
+        var checked = Array.from(dropdown.querySelectorAll("input:checked")).map(function(c){ return c.value; });
+        player.skills = SKILLS.filter(function(s){ return checked.indexOf(s) >= 0; });
+        display.textContent = player.skills.length ? player.skills.join(", ") : "攜帶絕技";
+        dirtyPlayerIds.add(player.id);
+      });
+      cb.addEventListener("mousedown", function(e) { e.stopPropagation(); div.draggable = false; });
+      cb.addEventListener("mouseup",   function()  { div.draggable = true; });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(" " + sk));
+      dropdown.appendChild(label);
+    });
+
+    // 攔截 dropdown 內部所有 click，防止冒泡到 document 觸發關閉
+    dropdown.addEventListener("click", function(e) { e.stopPropagation(); });
+
+    clickTarget.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var isOpen = dropdown.parentNode === document.body;
+      closeAllDropdowns();
+      if (!isOpen) {
+        var rect = clickTarget.getBoundingClientRect();
+        dropdown.style.top = (rect.bottom + 3) + "px";
+        dropdown.style.left = rect.left + "px";
+        dropdown.style.display = "block";
+        document.body.appendChild(dropdown);
+      }
+    });
+    clickTarget.addEventListener("mousedown", function(e) { e.stopPropagation(); div.draggable = false; });
+    clickTarget.addEventListener("mouseup",   function()  { div.draggable = true; });
+
+    wrapper.appendChild(clickTarget);
+    // dropdown 不掛在 wrapper 下，點擊時才 portal 到 document.body
+    return wrapper;
+  }
+
+  // ─── 建立玩家標籤（團隊區：名字 | 多技能勾選）───────────
   function createTeamPlayerTag(player) {
     var div = document.createElement("div");
     div.className = "player-tag player-tag-team";
@@ -183,23 +216,17 @@
       div.classList.add("player-leave");
     }
 
-    div.innerHTML =
-      '<span class="fw-bold">' + player.name + '</span>' +
-      '<span class="skill-separator">|</span>' +
-      buildSkillSelect(player.id, player.skill);
+    var nameSpan = document.createElement("span");
+    nameSpan.className = "fw-bold";
+    nameSpan.textContent = player.name;
 
-    var select = div.querySelector('.skill-select');
-    select.addEventListener("change", function() {
-      player.skill = this.value;
-      dirtyPlayerIds.add(player.id);
-    });
-    select.addEventListener("mousedown", function(e) {
-      e.stopPropagation();
-      div.draggable = false;
-    });
-    select.addEventListener("mouseup", function() {
-      div.draggable = true;
-    });
+    var sep = document.createElement("span");
+    sep.className = "skill-separator";
+    sep.textContent = "|";
+
+    div.appendChild(nameSpan);
+    div.appendChild(sep);
+    div.appendChild(buildSkillMultiSelect(player, div));
 
     addDragEvents(div, player.id);
     return div;
@@ -396,6 +423,7 @@
 
   // ─── 渲染全部 ────────────────────────────────────────────
   function renderAll() {
+    closeAllDropdowns();
     Object.keys(groupCounts).forEach(function(gk) {
       renderTeamGroups(gk);
     });
@@ -488,7 +516,7 @@
     var changedAssignments = allPlayers
       .filter(function(p) { return dirtyPlayerIds.has(p.id); })
       .map(function(p) {
-        return { id: p.id, group_name: p.group_name || "", team_name: p.team_name || "", skill: p.skill || "" };
+        return { id: p.id, group_name: p.group_name || "", team_name: p.team_name || "", skill: p.skills.join("|") };
       });
     var changedTeamConfigs = Object.values(dirtyTeamConfigs);
 
@@ -573,7 +601,7 @@
           var tag = document.createElement("div");
           var js = JOB_STYLES[p.job] || {bg:"#ccc",fg:"#000"};
           tag.style.cssText = "background:" + js.bg + ";color:" + js.fg + ";padding:2px 8px;border-radius:4px;font-size:12px;font-weight:bold;text-align:center;";
-          tag.textContent = p.name + (p.skill ? " | " + p.skill : "");
+          tag.textContent = p.name + (p.skills && p.skills.length ? " | " + p.skills.join(", ") : "");
           slot.appendChild(tag);
         });
 
@@ -618,6 +646,14 @@
       alert("匯出圖片失敗");
     });
   });
+
+  // ─── 點擊空白處關閉技能下拉 ──────────────────────────────
+  document.addEventListener("click", closeAllDropdowns);
+  // 捲動時關閉，但排除 dropdown 內部捲動
+  window.addEventListener("scroll", function(e) {
+    if (e.target instanceof Element && e.target.closest(".skill-multi-dropdown")) return;
+    closeAllDropdowns();
+  }, true);
 
   // ─── 初始渲染 ────────────────────────────────────────────
   renderAll();

@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 style="color:#1760a5; font-weight:bold; margin:0;">職業管理</h5>
+  <button class="btn btn-primary btn-sm rounded-pill px-3"
+          data-bs-toggle="modal" data-bs-target="#addJobModal">
+    + 新增職業
+  </button>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle" id="jobsTable">
+    <thead class="table-light">
+      <tr>
+        <th>職業名稱</th>
+        <th>預覽</th>
+        <th>背景色</th>
+        <th>文字色</th>
+        <th style="width:140px;">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in all_jobs %}
+      <tr id="job-row-{{ job.id }}">
+        <td class="fw-bold">{{ job.name }}</td>
+        <td>
+          <span class="badge px-3 py-2"
+                style="background-color:{{ job.color }}; color:{{ job.text_color }}; font-size:0.9em;">
+            {{ job.name }}
+          </span>
+        </td>
+        <td>
+          <span class="color-swatch" style="background:{{ job.color }};"></span>
+          <code>{{ job.color }}</code>
+        </td>
+        <td>
+          <span class="color-swatch" style="background:{{ job.text_color }};"></span>
+          <code>{{ job.text_color }}</code>
+        </td>
+        <td>
+          <button class="btn btn-outline-primary btn-sm me-1 edit-job-btn"
+                  data-id="{{ job.id }}"
+                  data-name="{{ job.name }}"
+                  data-color="{{ job.color }}"
+                  data-text-color="{{ job.text_color }}"
+                  data-bs-toggle="modal" data-bs-target="#editJobModal">
+            編輯
+          </button>
+          <button class="btn btn-outline-danger btn-sm delete-job-btn"
+                  data-id="{{ job.id }}" data-name="{{ job.name }}">
+            刪除
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- 新增職業 Modal -->
+<div class="modal fade" id="addJobModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">新增職業</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">職業名稱</label>
+          <input type="text" class="form-control" id="addJobName" placeholder="例：鐵衣">
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">背景色</label>
+            <div class="d-flex align-items-center gap-2">
+              <input type="color" class="form-control form-control-color" id="addJobColor" value="#CCCCCC">
+              <code id="addJobColorText">#CCCCCC</code>
+            </div>
+          </div>
+          <div class="col">
+            <label class="form-label">文字色</label>
+            <div class="d-flex align-items-center gap-2">
+              <input type="color" class="form-control form-control-color" id="addJobTextColor" value="#000000">
+              <code id="addJobTextColorText">#000000</code>
+            </div>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">預覽</label><br>
+          <span id="addJobPreview" class="badge px-3 py-2"
+                style="font-size:1em; background-color:#CCCCCC; color:#000000;">職業名稱</span>
+        </div>
+        <div id="addJobError" class="text-danger mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="addJobSubmit">新增</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 編輯職業 Modal -->
+<div class="modal fade" id="editJobModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">編輯職業</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editJobId">
+        <div class="mb-3">
+          <label class="form-label">職業名稱</label>
+          <input type="text" class="form-control" id="editJobName">
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">背景色</label>
+            <div class="d-flex align-items-center gap-2">
+              <input type="color" class="form-control form-control-color" id="editJobColor">
+              <code id="editJobColorText"></code>
+            </div>
+          </div>
+          <div class="col">
+            <label class="form-label">文字色</label>
+            <div class="d-flex align-items-center gap-2">
+              <input type="color" class="form-control form-control-color" id="editJobTextColor">
+              <code id="editJobTextColorText"></code>
+            </div>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">預覽</label><br>
+          <span id="editJobPreview" class="badge px-3 py-2" style="font-size:1em;"></span>
+        </div>
+        <div id="editJobError" class="text-danger mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="editJobSubmit">儲存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.color-swatch {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+</style>
+
+<script>
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildRowHTML(job) {
+  return `
+    <td class="fw-bold">${escHtml(job.name)}</td>
+    <td><span class="badge px-3 py-2" style="background-color:${job.color}; color:${job.text_color}; font-size:0.9em;">${escHtml(job.name)}</span></td>
+    <td><span class="color-swatch" style="background:${job.color};"></span><code>${job.color}</code></td>
+    <td><span class="color-swatch" style="background:${job.text_color};"></span><code>${job.text_color}</code></td>
+    <td>
+      <button class="btn btn-outline-primary btn-sm me-1 edit-job-btn"
+              data-id="${job.id}" data-name="${escHtml(job.name)}"
+              data-color="${job.color}" data-text-color="${job.text_color}"
+              data-bs-toggle="modal" data-bs-target="#editJobModal">編輯</button>
+      <button class="btn btn-outline-danger btn-sm delete-job-btn"
+              data-id="${job.id}" data-name="${escHtml(job.name)}">刪除</button>
+    </td>
+  `;
+}
+
+function bindRowEvents(tr) {
+  tr.querySelector('.edit-job-btn').addEventListener('click', openEditModal);
+  tr.querySelector('.delete-job-btn').addEventListener('click', deleteJob);
+}
+
+// ── 新增職業 ──────────────────────────────────────
+function syncAddPreview() {
+  var name  = document.getElementById('addJobName').value || '職業名稱';
+  var color = document.getElementById('addJobColor').value;
+  var tColor = document.getElementById('addJobTextColor').value;
+  var p = document.getElementById('addJobPreview');
+  p.textContent = name;
+  p.style.backgroundColor = color;
+  p.style.color = tColor;
+  document.getElementById('addJobColorText').textContent = color;
+  document.getElementById('addJobTextColorText').textContent = tColor;
+}
+['addJobName','addJobColor','addJobTextColor'].forEach(function(id){
+  document.getElementById(id).addEventListener('input', syncAddPreview);
+});
+
+document.getElementById('addJobSubmit').addEventListener('click', function() {
+  var name     = document.getElementById('addJobName').value.trim();
+  var color    = document.getElementById('addJobColor').value;
+  var textColor = document.getElementById('addJobTextColor').value;
+  document.getElementById('addJobError').textContent = '';
+  if (!name) { document.getElementById('addJobError').textContent = '職業名稱不能為空'; return; }
+
+  fetch('/api/jobs', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, color, text_color: textColor})
+  }).then(r => r.json()).then(function(data) {
+    if (data.status === 'success') {
+      var tbody = document.querySelector('#jobsTable tbody');
+      var tr = document.createElement('tr');
+      tr.id = 'job-row-' + data.id;
+      tr.innerHTML = buildRowHTML(data);
+      tbody.appendChild(tr);
+      bindRowEvents(tr);
+      // 重置表單
+      document.getElementById('addJobName').value = '';
+      document.getElementById('addJobColor').value = '#CCCCCC';
+      document.getElementById('addJobTextColor').value = '#000000';
+      syncAddPreview();
+      bootstrap.Modal.getInstance(document.getElementById('addJobModal')).hide();
+    } else {
+      document.getElementById('addJobError').textContent = data.message || '新增失敗';
+    }
+  });
+});
+
+// ── 編輯職業 ──────────────────────────────────────
+function syncEditPreview() {
+  var name   = document.getElementById('editJobName').value || '職業名稱';
+  var color  = document.getElementById('editJobColor').value;
+  var tColor = document.getElementById('editJobTextColor').value;
+  var p = document.getElementById('editJobPreview');
+  p.textContent = name;
+  p.style.backgroundColor = color;
+  p.style.color = tColor;
+  document.getElementById('editJobColorText').textContent = color;
+  document.getElementById('editJobTextColorText').textContent = tColor;
+}
+['editJobName','editJobColor','editJobTextColor'].forEach(function(id){
+  document.getElementById(id).addEventListener('input', syncEditPreview);
+});
+
+function openEditModal() {
+  var btn = this;
+  document.getElementById('editJobId').value    = btn.dataset.id;
+  document.getElementById('editJobName').value  = btn.dataset.name;
+  document.getElementById('editJobColor').value = btn.dataset.color;
+  document.getElementById('editJobTextColor').value = btn.dataset.textColor;
+  document.getElementById('editJobError').textContent = '';
+  syncEditPreview();
+}
+document.querySelectorAll('.edit-job-btn').forEach(function(btn){
+  btn.addEventListener('click', openEditModal);
+});
+
+document.getElementById('editJobSubmit').addEventListener('click', function() {
+  var id       = document.getElementById('editJobId').value;
+  var name     = document.getElementById('editJobName').value.trim();
+  var color    = document.getElementById('editJobColor').value;
+  var textColor = document.getElementById('editJobTextColor').value;
+  document.getElementById('editJobError').textContent = '';
+  if (!name) { document.getElementById('editJobError').textContent = '職業名稱不能為空'; return; }
+
+  fetch('/api/jobs/' + id, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, color, text_color: textColor})
+  }).then(r => r.json()).then(function(data) {
+    if (data.status === 'success') {
+      var tr = document.getElementById('job-row-' + id);
+      tr.innerHTML = buildRowHTML(data);
+      bindRowEvents(tr);
+      bootstrap.Modal.getInstance(document.getElementById('editJobModal')).hide();
+    } else {
+      document.getElementById('editJobError').textContent = data.message || '儲存失敗';
+    }
+  });
+});
+
+// ── 刪除職業 ──────────────────────────────────────
+function deleteJob() {
+  var id   = this.dataset.id;
+  var name = this.dataset.name;
+  if (!confirm('確定要刪除職業「' + name + '」嗎？')) return;
+  fetch('/api/jobs/' + id + '/delete', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'}
+  }).then(r => r.json()).then(function(data) {
+    if (data.status === 'success') {
+      document.getElementById('job-row-' + id).remove();
+    } else {
+      alert('刪除失敗：' + (data.message || '未知錯誤'));
+    }
+  });
+}
+document.querySelectorAll('.delete-job-btn').forEach(function(btn){
+  btn.addEventListener('click', deleteJob);
+});
+</script>
+{% endblock %}

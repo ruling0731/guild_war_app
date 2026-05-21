@@ -16,6 +16,37 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+DEFAULT_JOBS = [
+    {"name": "鐵衣", "color": "#FFD8A8", "text_color": "#000000"},
+    {"name": "血河", "color": "#FFB3B3", "text_color": "#000000"},
+    {"name": "碎夢", "color": "#B3E5FC", "text_color": "#000000"},
+    {"name": "神相", "color": "#A7C7E7", "text_color": "#000000"},
+    {"name": "九靈", "color": "#E1BEE7", "text_color": "#000000"},
+    {"name": "玄機", "color": "#FFF59D", "text_color": "#000000"},
+    {"name": "素問", "color": "#F8BBD0", "text_color": "#000000"},
+    {"name": "龍吟", "color": "#C8E6C9", "text_color": "#000000"},
+]
+
+DEFAULT_SKILLS = [
+    "流風輕雲(奶絕)", "鈞天浩意(砲)", "法天象地", "蝶舞清夢", "劍魂沖銷",
+    "大鬧天宮", "騰龍越淵", "九天雷引", "冰火絕滅", "劍破乾坤",
+    "太極圖", "萬劍訣", "奪破寶典", "紅蓮焚夜", "狂發一怒",
+    "殘心三絕劍", "繁花一夢", "長歌獻君", "蓋世訣", "天下無狗",
+    "春華佑世", "昀光神劍",
+]
+
+# 職業資料表
+class Job(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    color = db.Column(db.String(10), default='#CCCCCC')
+    text_color = db.Column(db.String(10), default='#000000')
+
+# 技能資料表
+class Skill(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+
 # 玩家資料表
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -25,12 +56,12 @@ class Player(db.Model):
     group_name = db.Column(db.String(50))
     team_name = db.Column(db.String(50))
     role_note = db.Column(db.String(100))
-    skill = db.Column(db.String(50))
+    skill = db.Column(db.String(500))
     is_guild = db.Column(db.Boolean, default=False)
     is_challenge = db.Column(db.Boolean, default=False)
     challenge_group_name = db.Column(db.String(50))
     challenge_team_name = db.Column(db.String(50))
-    challenge_skill = db.Column(db.String(50))
+    challenge_skill = db.Column(db.String(500))
 
 # 團隊編成小隊名稱設定表
 class TeamConfig(db.Model):
@@ -66,16 +97,36 @@ with app.app_context():
                 conn.execute(db.text(ddl))
         conn.commit()
 
+    # 預設職業資料（若資料庫為空）
+    if Job.query.count() == 0:
+        for jd in DEFAULT_JOBS:
+            db.session.add(Job(**jd))
+        db.session.commit()
+
+    # 預設技能資料（若資料庫為空）
+    if Skill.query.count() == 0:
+        for sname in DEFAULT_SKILLS:
+            db.session.add(Skill(name=sname))
+        db.session.commit()
+
+@app.context_processor
+def inject_global():
+    jobs = Job.query.order_by(Job.id).all()
+    return dict(
+        all_jobs=jobs,
+        job_styles={j.name: {"bg": j.color, "fg": j.text_color} for j in jobs}
+    )
+
 # 首頁：大表格顯示 + 職業統計
 @app.route('/')
 def index():
-    jobs = ["鐵衣", "血河", "碎夢", "神相", "九靈", "玄機", "素問", "龍吟"]
+    jobs = Job.query.order_by(Job.id).all()
 
     stats = {}
-    for job in jobs:
-        total = Player.query.filter_by(job=job).count()
-        leave = Player.query.filter_by(job=job, can_fight=False).count()
-        stats[job] = {"total": total, "leave": leave, "can_fight": total - leave}
+    for j in jobs:
+        total = Player.query.filter_by(job=j.name).count()
+        leave = Player.query.filter_by(job=j.name, can_fight=False).count()
+        stats[j.name] = {"total": total, "leave": leave, "can_fight": total - leave}
 
     grouped = defaultdict(list)
     for p in Player.query.all():
@@ -83,7 +134,7 @@ def index():
 
     max_len = max((len(v) for v in grouped.values()), default=0)
 
-    return render_template('index.html', stats=stats, grouped=grouped, jobs=jobs, max_len=max_len)
+    return render_template('index.html', stats=stats, grouped=grouped, jobs=[j.name for j in jobs], max_len=max_len)
 
 # 新增玩家
 @app.route('/add_player', methods=['GET'])
@@ -112,7 +163,7 @@ def batch_add():
     if request.method == 'POST':
         players_text = request.form.get('players', '').strip()
         lines = players_text.splitlines()
-        valid_jobs = ["鐵衣","血河","碎夢","神相","九靈","玄機","素問","龍吟"]
+        valid_jobs = [j.name for j in Job.query.all()]
 
         added_count = 0
         errors = []
@@ -191,6 +242,7 @@ def _build_team_name_configs(config_model):
 # 團隊編成頁面（只顯示幫眾）
 @app.route('/team_assign')
 def team_assign():
+    skills = [s.name for s in Skill.query.order_by(Skill.id).all()]
     players_data = [
         {"id": p.id, "name": p.player_name, "job": p.job, "can_fight": p.can_fight,
          "group_name": p.group_name or "", "team_name": p.team_name or "", "skill": p.skill or ""}
@@ -198,6 +250,7 @@ def team_assign():
     ]
     return render_template('team_assign.html',
                            players=players_data,
+                           skills=skills,
                            team_name_configs=_build_team_name_configs(TeamConfig),
                            save_url='/team_assign_update',
                            page_title='團隊編成')
@@ -205,6 +258,7 @@ def team_assign():
 # 約戰頁面（只顯示約戰成員）
 @app.route('/challenge_assign')
 def challenge_assign():
+    skills = [s.name for s in Skill.query.order_by(Skill.id).all()]
     players_data = [
         {"id": p.id, "name": p.player_name, "job": p.job, "can_fight": p.can_fight,
          "group_name": p.challenge_group_name or "", "team_name": p.challenge_team_name or "", "skill": p.challenge_skill or ""}
@@ -212,6 +266,7 @@ def challenge_assign():
     ]
     return render_template('team_assign.html',
                            players=players_data,
+                           skills=skills,
                            team_name_configs=_build_team_name_configs(ChallengeTeamConfig),
                            save_url='/challenge_assign_update',
                            page_title='約戰')
@@ -270,7 +325,7 @@ def export_all():
         "隊伍": p.team_name,
         "名字": p.player_name,
         "職業": p.job,
-        "絕技": p.skill,
+        "絕技": (p.skill or "").replace("|", ", "),
         "備註": p.role_note,
         "狀態": "能打" if p.can_fight else "請假"
     } for p in players]
@@ -306,7 +361,7 @@ def toggle_status(id):
 # 刪除玩家
 @app.route('/delete_page')
 def delete_page():
-    jobs = ["鐵衣", "血河", "碎夢", "神相", "九靈", "玄機", "素問", "龍吟"]
+    jobs = [j.name for j in Job.query.order_by(Job.id).all()]
     grouped = defaultdict(list)
     for p in Player.query.all():
         grouped[p.job].append(p)
@@ -317,6 +372,96 @@ def delete_page():
 def delete_player(id):
     player = Player.query.get_or_404(id)
     db.session.delete(player)
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+# ─── 職業管理 ─────────────────────────────────────────────────
+@app.route('/manage_jobs')
+def manage_jobs():
+    return render_template('manage_jobs.html')
+
+@app.route('/api/jobs', methods=['POST'])
+def api_add_job():
+    data = request.get_json()
+    name = (data.get('name') or '').strip()
+    color = data.get('color', '#CCCCCC')
+    text_color = data.get('text_color', '#000000')
+    if not name:
+        return jsonify({"status": "error", "message": "職業名稱不能為空"}), 400
+    if Job.query.filter_by(name=name).first():
+        return jsonify({"status": "error", "message": "職業名稱已存在"}), 400
+    job = Job(name=name, color=color, text_color=text_color)
+    db.session.add(job)
+    db.session.commit()
+    return jsonify({"status": "success", "id": job.id, "name": job.name,
+                    "color": job.color, "text_color": job.text_color})
+
+@app.route('/api/jobs/<int:id>', methods=['POST'])
+def api_edit_job(id):
+    job = Job.query.get_or_404(id)
+    data = request.get_json()
+    name = (data.get('name') or '').strip()
+    color = data.get('color', job.color)
+    text_color = data.get('text_color', job.text_color)
+    if not name:
+        return jsonify({"status": "error", "message": "職業名稱不能為空"}), 400
+    existing = Job.query.filter_by(name=name).first()
+    if existing and existing.id != id:
+        return jsonify({"status": "error", "message": "職業名稱已存在"}), 400
+    job.name = name
+    job.color = color
+    job.text_color = text_color
+    db.session.commit()
+    return jsonify({"status": "success", "id": job.id, "name": job.name,
+                    "color": job.color, "text_color": job.text_color})
+
+@app.route('/api/jobs/<int:id>/delete', methods=['POST'])
+def api_delete_job(id):
+    job = Job.query.get_or_404(id)
+    count = Player.query.filter_by(job=job.name).count()
+    if count > 0:
+        return jsonify({"status": "error", "message": f"有 {count} 名玩家使用此職業，無法刪除"}), 400
+    db.session.delete(job)
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+# ─── 技能管理 ─────────────────────────────────────────────────
+@app.route('/manage_skills')
+def manage_skills():
+    skills = Skill.query.order_by(Skill.id).all()
+    return render_template('manage_skills.html', all_skills=skills)
+
+@app.route('/api/skills', methods=['POST'])
+def api_add_skill():
+    data = request.get_json()
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({"status": "error", "message": "技能名稱不能為空"}), 400
+    if Skill.query.filter_by(name=name).first():
+        return jsonify({"status": "error", "message": "技能名稱已存在"}), 400
+    skill = Skill(name=name)
+    db.session.add(skill)
+    db.session.commit()
+    return jsonify({"status": "success", "id": skill.id, "name": skill.name})
+
+@app.route('/api/skills/<int:id>', methods=['POST'])
+def api_edit_skill(id):
+    skill = Skill.query.get_or_404(id)
+    data = request.get_json()
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({"status": "error", "message": "技能名稱不能為空"}), 400
+    existing = Skill.query.filter_by(name=name).first()
+    if existing and existing.id != id:
+        return jsonify({"status": "error", "message": "技能名稱已存在"}), 400
+    skill.name = name
+    db.session.commit()
+    return jsonify({"status": "success", "id": skill.id, "name": skill.name})
+
+@app.route('/api/skills/<int:id>/delete', methods=['POST'])
+def api_delete_skill(id):
+    skill = Skill.query.get_or_404(id)
+    db.session.delete(skill)
     db.session.commit()
     return jsonify({"status": "success"})
 
