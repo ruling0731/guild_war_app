@@ -603,5 +603,22 @@ def bot_set_status():
     })
 
 
+# 4. 全員狀態重置為能打
+@app.route('/api/bot/reset_all_status', methods=['POST'])
+def bot_reset_all_status():
+    data = request.get_json() or {}
+    context = (data.get('context') or 'both').strip()
+    if context not in ('team', 'challenge', 'both'):
+        return jsonify({"status": "error", "message": "context 只接受 'team'、'challenge' 或 'both'"}), 400
+
+    if context in ('team', 'both'):
+        Player.query.update({Player.can_fight: True})
+    if context in ('challenge', 'both'):
+        Player.query.update({Player.challenge_can_fight: True})
+    db.session.commit()
+
+    return jsonify({"status": "success", "context": context})
+
+
 if __name__ == '__main__':
     app.run(debug=True)
