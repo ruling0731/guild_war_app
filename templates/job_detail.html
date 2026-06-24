@@ -9,6 +9,12 @@
     <input type="text" class="form-control" value="{{ player.player_name }}" disabled>
   </div>
 
+  <!-- 主職業 -->
+  <div class="mb-3">
+    <label class="form-label fw-bold">主職業</label>
+    <input type="text" class="form-control" value="{{ player.main_job }}" disabled>
+  </div>
+
   <!-- 分組 -->
   <form method="post">
     <div class="mb-3">
@@ -55,6 +61,17 @@
       </div>
     </div>
 
+    <!-- 副職業 -->
+    <div class="mb-3">
+      <label class="form-label fw-bold">副職業</label>
+      <select class="form-select" name="sub_job">
+        <option value="">無</option>
+        {% for j in all_jobs %}
+        <option value="{{ j.name }}" {% if player.sub_job == j.name %}selected{% endif %}>{{ j.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
     <!-- 備註 -->
     <div class="mb-3">
       <label class="form-label fw-bold">備註</label>
@@ -63,7 +80,7 @@
 
     <!-- 儲存 / 返回 -->
     <div class="d-flex justify-content-between mt-4">
-      <a href="{{ url_for('job_page', job=player.job) }}" class="btn btn-outline-secondary">返回</a>
+      <a href="{{ url_for('job_page', job=player.main_job) }}" class="btn btn-outline-secondary">返回</a>
       <button type="submit" class="btn btn-primary">💾 儲存</button>
     </div>
   </form>

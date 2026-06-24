@@ -5,6 +5,12 @@ import pandas as pd
 from io import BytesIO
 from collections import defaultdict
 import os
+import base64
+import json
+import requests as req
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -12,6 +18,7 @@ app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'guild_war.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JSON_AS_ASCII'] = False
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -51,7 +58,8 @@ class Skill(db.Model):
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     player_name = db.Column(db.String(50), nullable=False)
-    job = db.Column(db.String(20), nullable=False)
+    main_job = db.Column(db.String(20), nullable=False)
+    sub_job = db.Column(db.String(20))
     can_fight = db.Column(db.Boolean, default=True)
     group_name = db.Column(db.String(50))
     team_name = db.Column(db.String(50))
@@ -62,6 +70,9 @@ class Player(db.Model):
     challenge_group_name = db.Column(db.String(50))
     challenge_team_name = db.Column(db.String(50))
     challenge_skill = db.Column(db.String(500))
+    team_active_job = db.Column(db.String(20))
+    challenge_active_job = db.Column(db.String(20))
+    challenge_can_fight = db.Column(db.Boolean, default=True)
 
 # 團隊編成小隊名稱設定表
 class TeamConfig(db.Model):
@@ -85,12 +96,21 @@ with app.app_context():
     with db.engine.connect() as conn:
         inspector = db.inspect(db.engine)
         player_cols = [c['name'] for c in inspector.get_columns('player')]
+        # 將舊欄位 job 改名為 main_job
+        if 'job' in player_cols and 'main_job' not in player_cols:
+            conn.execute(db.text('ALTER TABLE player RENAME COLUMN job TO main_job'))
+            conn.commit()
+            player_cols = [c['name'] for c in inspector.get_columns('player')]
         new_cols = [
+            ('sub_job',             'ALTER TABLE player ADD COLUMN sub_job VARCHAR(20)'),
             ('is_guild',            'ALTER TABLE player ADD COLUMN is_guild BOOLEAN DEFAULT 0'),
             ('is_challenge',        'ALTER TABLE player ADD COLUMN is_challenge BOOLEAN DEFAULT 0'),
             ('challenge_group_name','ALTER TABLE player ADD COLUMN challenge_group_name VARCHAR(50)'),
             ('challenge_team_name', 'ALTER TABLE player ADD COLUMN challenge_team_name VARCHAR(50)'),
-            ('challenge_skill',     'ALTER TABLE player ADD COLUMN challenge_skill VARCHAR(50)'),
+            ('challenge_skill',     'ALTER TABLE player ADD COLUMN challenge_skill VARCHAR(500)'),
+            ('team_active_job',      'ALTER TABLE player ADD COLUMN team_active_job VARCHAR(20)'),
+            ('challenge_active_job', 'ALTER TABLE player ADD COLUMN challenge_active_job VARCHAR(20)'),
+            ('challenge_can_fight',  'ALTER TABLE player ADD COLUMN challenge_can_fight BOOLEAN DEFAULT 1'),
         ]
         for col, ddl in new_cols:
             if col not in player_cols:
@@ -124,13 +144,13 @@ def index():
 
     stats = {}
     for j in jobs:
-        total = Player.query.filter_by(job=j.name).count()
-        leave = Player.query.filter_by(job=j.name, can_fight=False).count()
+        total = Player.query.filter_by(main_job=j.name).count()
+        leave = Player.query.filter_by(main_job=j.name, can_fight=False).count()
         stats[j.name] = {"total": total, "leave": leave, "can_fight": total - leave}
 
     grouped = defaultdict(list)
     for p in Player.query.all():
-        grouped[p.job].append(p)
+        grouped[p.main_job].append(p)
 
     max_len = max((len(v) for v in grouped.values()), default=0)
 
@@ -144,15 +164,17 @@ def add_player_page():
 @app.route('/add_player', methods=['POST'])
 def add_player():
     name = request.form.get('name')
-    job = request.form.get('job')
+    main_job = request.form.get('main_job')
+    sub_job = request.form.get('sub_job') or None
     leave = request.form.get('leave')
     role_note = request.form.get('role_note')
     is_guild = bool(request.form.get('is_guild'))
     is_challenge = bool(request.form.get('is_challenge'))
     can_fight = False if leave else True
 
-    new_player = Player(player_name=name, job=job, can_fight=can_fight,
-                        role_note=role_note, is_guild=is_guild, is_challenge=is_challenge)
+    new_player = Player(player_name=name, main_job=main_job, sub_job=sub_job,
+                        can_fight=can_fight, role_note=role_note,
+                        is_guild=is_guild, is_challenge=is_challenge)
     db.session.add(new_player)
     db.session.commit()
     return jsonify({"status": "success"})
@@ -171,18 +193,21 @@ def batch_add():
         for idx, line in enumerate(lines, start=1):
             parts = [p.strip() for p in line.split(",")]
             if len(parts) < 2:
-                errors.append(f"第 {idx} 行格式錯誤：至少需要 名字,職業")
+                errors.append(f"第 {idx} 行格式錯誤：至少需要 名字,主職業")
                 continue
 
             name = parts[0]
-            job = parts[1]
-            note = parts[2] if len(parts) > 2 else None
+            main_job = parts[1]
+            sub_job = parts[2] if len(parts) > 2 and parts[2] in valid_jobs else None
+            note_idx = 3 if sub_job else 2
+            note = parts[note_idx] if len(parts) > note_idx else None
 
-            if job not in valid_jobs:
-                errors.append(f"第 {idx} 行職業錯誤：{job}")
+            if main_job not in valid_jobs:
+                errors.append(f"第 {idx} 行主職業錯誤：{main_job}")
                 continue
 
-            new_player = Player(player_name=name, job=job, can_fight=True, role_note=note)
+            new_player = Player(player_name=name, main_job=main_job, sub_job=sub_job,
+                                can_fight=True, role_note=note)
             db.session.add(new_player)
             added_count += 1
 
@@ -190,22 +215,23 @@ def batch_add():
             db.session.commit()
 
         if errors:
-            return render_template('batch_error.html', errors=errors, count=added_count)
+            return render_template('batch_add_fail.html', errors=errors, count=added_count)
         else:
-            return render_template('batch_result.html', count=added_count)
+            return render_template('batch_add_success.html', count=added_count)
 
     return render_template('batch_add.html')
 
 # 職業分頁（總覽 + 批次更新）
 @app.route('/job/<job>', methods=['GET', 'POST'])
 def job_page(job):
-    players = Player.query.filter_by(job=job).all()
+    players = Player.query.filter_by(main_job=job).all()
 
     if request.method == 'POST':
         for player in players:
             player.group_name = request.form.get(f"group_name_{player.id}") or None
             player.team_name = request.form.get(f"team_name_{player.id}") or None
             player.role_note = request.form.get(f"role_note_{player.id}") or None
+            player.sub_job = request.form.get(f"sub_job_{player.id}") or None
             player.is_guild = bool(request.form.get(f"is_guild_{player.id}"))
             player.is_challenge = bool(request.form.get(f"is_challenge_{player.id}"))
         db.session.commit()
@@ -222,11 +248,12 @@ def job_detail(id):
         player.group_name = request.form.get('group_name')
         player.team_name = request.form.get('team_name')
         player.role_note = request.form.get('role_note')
+        player.sub_job = request.form.get('sub_job') or None
         player.is_guild = bool(request.form.get('is_guild'))
         player.is_challenge = bool(request.form.get('is_challenge'))
 
         db.session.commit()
-        return redirect(url_for('job_page', job=player.job))
+        return redirect(url_for('job_page', job=player.main_job))
 
     return render_template('job_detail.html', player=player)
 
@@ -244,8 +271,10 @@ def _build_team_name_configs(config_model):
 def team_assign():
     skills = [s.name for s in Skill.query.order_by(Skill.id).all()]
     players_data = [
-        {"id": p.id, "name": p.player_name, "job": p.job, "can_fight": p.can_fight,
-         "group_name": p.group_name or "", "team_name": p.team_name or "", "skill": p.skill or ""}
+        {"id": p.id, "name": p.player_name, "job": p.main_job, "sub_job": p.sub_job or "",
+         "can_fight": p.can_fight,
+         "group_name": p.group_name or "", "team_name": p.team_name or "", "skill": p.skill or "",
+         "active_job": p.team_active_job or p.main_job}
         for p in Player.query.filter_by(is_guild=True).all()
     ]
     return render_template('team_assign.html',
@@ -253,15 +282,19 @@ def team_assign():
                            skills=skills,
                            team_name_configs=_build_team_name_configs(TeamConfig),
                            save_url='/team_assign_update',
-                           page_title='團隊編成')
+                           page_title='團隊編成',
+                           publish_context='team',
+                           mention_role_name=os.getenv('GUILD_WAR_TEAM_ROLE_NAME', '小泡泡'))
 
 # 約戰頁面（只顯示約戰成員）
 @app.route('/challenge_assign')
 def challenge_assign():
     skills = [s.name for s in Skill.query.order_by(Skill.id).all()]
     players_data = [
-        {"id": p.id, "name": p.player_name, "job": p.job, "can_fight": p.can_fight,
-         "group_name": p.challenge_group_name or "", "team_name": p.challenge_team_name or "", "skill": p.challenge_skill or ""}
+        {"id": p.id, "name": p.player_name, "job": p.main_job, "sub_job": p.sub_job or "",
+         "can_fight": p.challenge_can_fight if p.challenge_can_fight is not None else True,
+         "group_name": p.challenge_group_name or "", "team_name": p.challenge_team_name or "", "skill": p.challenge_skill or "",
+         "active_job": p.challenge_active_job or p.main_job}
         for p in Player.query.filter_by(is_challenge=True).all()
     ]
     return render_template('team_assign.html',
@@ -269,15 +302,18 @@ def challenge_assign():
                            skills=skills,
                            team_name_configs=_build_team_name_configs(ChallengeTeamConfig),
                            save_url='/challenge_assign_update',
-                           page_title='約戰')
+                           page_title='約戰',
+                           publish_context='challenge',
+                           mention_role_name=os.getenv('GUILD_WAR_CHALLENGE_ROLE_NAME', '俱樂部'))
 
 def _save_assign_update(data, player_fields, config_model):
     for item in data.get('assignments', []):
         player = Player.query.get(item['id'])
         if player:
-            setattr(player, player_fields['group'], item.get('group_name') or None)
-            setattr(player, player_fields['team'],  item.get('team_name')  or None)
-            setattr(player, player_fields['skill'], item.get('skill')      or None)
+            setattr(player, player_fields['group'],      item.get('group_name')  or None)
+            setattr(player, player_fields['team'],       item.get('team_name')   or None)
+            setattr(player, player_fields['skill'],      item.get('skill')       or None)
+            setattr(player, player_fields['active_job'], item.get('active_job')  or None)
     for cfg in data.get('team_configs', []):
         existing = config_model.query.filter_by(
             group_name=cfg['group_name'], slot_index=cfg['slot_index']
@@ -299,7 +335,7 @@ def team_assign_update():
     if not data:
         return jsonify({"status": "error", "message": "無效的資料格式"}), 400
     _save_assign_update(data,
-                        {'group': 'group_name', 'team': 'team_name', 'skill': 'skill'},
+                        {'group': 'group_name', 'team': 'team_name', 'skill': 'skill', 'active_job': 'team_active_job'},
                         TeamConfig)
     return jsonify({"status": "success"})
 
@@ -310,7 +346,7 @@ def challenge_assign_update():
     if not data:
         return jsonify({"status": "error", "message": "無效的資料格式"}), 400
     _save_assign_update(data,
-                        {'group': 'challenge_group_name', 'team': 'challenge_team_name', 'skill': 'challenge_skill'},
+                        {'group': 'challenge_group_name', 'team': 'challenge_team_name', 'skill': 'challenge_skill', 'active_job': 'challenge_active_job'},
                         ChallengeTeamConfig)
     return jsonify({"status": "success"})
 
@@ -324,7 +360,8 @@ def export_all():
         "分組": p.group_name,
         "隊伍": p.team_name,
         "名字": p.player_name,
-        "職業": p.job,
+        "主職業": p.main_job,
+        "副職業": p.sub_job or "",
         "絕技": (p.skill or "").replace("|", ", "),
         "備註": p.role_note,
         "狀態": "能打" if p.can_fight else "請假"
@@ -364,7 +401,7 @@ def delete_page():
     jobs = [j.name for j in Job.query.order_by(Job.id).all()]
     grouped = defaultdict(list)
     for p in Player.query.all():
-        grouped[p.job].append(p)
+        grouped[p.main_job].append(p)
     max_len = max((len(v) for v in grouped.values()), default=0)
     return render_template('delete.html', grouped=grouped, jobs=jobs, max_len=max_len)
 
@@ -418,7 +455,7 @@ def api_edit_job(id):
 @app.route('/api/jobs/<int:id>/delete', methods=['POST'])
 def api_delete_job(id):
     job = Job.query.get_or_404(id)
-    count = Player.query.filter_by(job=job.name).count()
+    count = Player.query.filter_by(main_job=job.name).count()
     if count > 0:
         return jsonify({"status": "error", "message": f"有 {count} 名玩家使用此職業，無法刪除"}), 400
     db.session.delete(job)
@@ -464,6 +501,107 @@ def api_delete_skill(id):
     db.session.delete(skill)
     db.session.commit()
     return jsonify({"status": "success"})
+
+# ─── 發佈編成圖到 Discord ─────────────────────────────────────
+
+@app.route('/api/publish', methods=['POST'])
+def publish_to_discord():
+    data = request.get_json()
+    context     = (data.get('context') or '').strip()
+    content     = (data.get('content') or '').strip()
+    mention_all = bool(data.get('mention_all', False))
+    image_b64   = data.get('image', '')
+
+    if context == 'team':
+        webhook_url = os.getenv('GUILD_WAR_TEAM_WEBHOOK', '')
+        role_id     = os.getenv('GUILD_WAR_TEAM_ROLE_ID', '')
+    elif context == 'challenge':
+        webhook_url = os.getenv('GUILD_WAR_CHALLENGE_WEBHOOK', '')
+        role_id     = os.getenv('GUILD_WAR_CHALLENGE_ROLE_ID', '')
+    else:
+        return jsonify({"status": "error", "message": "無效的 context"}), 400
+
+    if not webhook_url or webhook_url.startswith('https://discord.com/api/webhooks/你的'):
+        return jsonify({"status": "error", "message": "Webhook URL 尚未設定，請編輯 .env 檔案"}), 500
+
+    # 解碼 base64 圖片（去掉 data:image/png;base64, 前綴）
+    if ',' in image_b64:
+        image_b64 = image_b64.split(',', 1)[1]
+    img_bytes = base64.b64decode(image_b64)
+
+    role_mention = f"<@&{role_id}>\n" if (mention_all and role_id) else ""
+    message = role_mention + content
+
+    resp = req.post(
+        webhook_url,
+        data={"payload_json": json.dumps({"content": message})},
+        files={"files[0]": ("編成圖.png", BytesIO(img_bytes), "image/png")},
+    )
+
+    if resp.status_code in (200, 204):
+        return jsonify({"status": "success"})
+    else:
+        return jsonify({"status": "error", "message": f"Discord 回應 {resp.status_code}"}), 500
+
+
+# ─── Discord Bot API ──────────────────────────────────────────
+
+# 1. 取得職業列表
+@app.route('/api/bot/jobs', methods=['GET'])
+def bot_get_jobs():
+    jobs = Job.query.order_by(Job.id).all()
+    return jsonify({"status": "success", "jobs": [j.name for j in jobs]})
+
+# 2. 查詢某職業的所有玩家名字
+@app.route('/api/bot/players', methods=['GET'])
+def bot_get_players_by_job():
+    job_name = request.args.get('job', '').strip()
+    if not job_name:
+        return jsonify({"status": "error", "message": "請提供 job 參數"}), 400
+    if not Job.query.filter_by(name=job_name).first():
+        return jsonify({"status": "error", "message": f"職業 '{job_name}' 不存在"}), 404
+    players = Player.query.filter_by(main_job=job_name).order_by(Player.player_name).all()
+    return jsonify({
+        "status": "success",
+        "job": job_name,
+        "players": [
+            {"name": p.player_name, "can_fight": p.can_fight}
+            for p in players
+        ]
+    })
+
+# 3. 更改玩家狀態（能打 / 請假）
+# context 參數：'team'（預設）或 'challenge'，分別對應不同欄位
+@app.route('/api/bot/set_status', methods=['POST'])
+def bot_set_status():
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "error", "message": "需要 JSON body"}), 400
+    name = (data.get('name') or '').strip()
+    status = (data.get('status') or '').strip()
+    context = (data.get('context') or 'team').strip()
+    if not name:
+        return jsonify({"status": "error", "message": "請提供 name"}), 400
+    if status not in ('能打', '請假'):
+        return jsonify({"status": "error", "message": "status 只接受 '能打' 或 '請假'"}), 400
+    if context not in ('team', 'challenge'):
+        return jsonify({"status": "error", "message": "context 只接受 'team' 或 'challenge'"}), 400
+    player = Player.query.filter_by(player_name=name).first()
+    if not player:
+        return jsonify({"status": "error", "message": f"找不到玩家 '{name}'"}), 404
+    can_fight = (status == '能打')
+    if context == 'challenge':
+        player.challenge_can_fight = can_fight
+    else:
+        player.can_fight = can_fight
+    db.session.commit()
+    return jsonify({
+        "status": "success",
+        "name": player.player_name,
+        "context": context,
+        "can_fight": can_fight
+    })
+
 
 if __name__ == '__main__':
     app.run(debug=True)

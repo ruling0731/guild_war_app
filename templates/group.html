@@ -18,7 +18,7 @@
         {% for player in players %}
         <tr id="row-{{ player.id }}">
             <td>{{ player.player_name }}</td>
-            <td>{{ player.job }}</td>
+            <td>{{ player.main_job }}{% if player.sub_job %} / {{ player.sub_job }}{% endif %}</td>
             <td>
                 <select class="form-select group-select" id="group-{{ player.id }}">
                     <option value="">未分組</option>

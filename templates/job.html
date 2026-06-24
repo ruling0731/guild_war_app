@@ -7,6 +7,7 @@
     <thead style="background-color:#fcd2e7; color:rgb(13, 35, 107);">
       <tr>
         <th>名字</th>
+        <th>副職業</th>
         <th>標籤</th>
         <th>分組</th>
         <th>隊伍</th>
@@ -19,6 +20,16 @@
       <tr>
         <!-- 名字 -->
         <td><span class="fw-bold text-primary">{{ player.player_name }}</span></td>
+
+        <!-- 副職業 -->
+        <td>
+          <select class="form-select form-select-sm" name="sub_job_{{ player.id }}">
+            <option value="">無</option>
+            {% for j in all_jobs %}
+            <option value="{{ j.name }}" {% if player.sub_job == j.name %}selected{% endif %}>{{ j.name }}</option>
+            {% endfor %}
+          </select>
+        </td>
 
         <!-- 幫眾 / 約戰 標籤勾選 -->
         <td>

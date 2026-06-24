@@ -4,3 +4,5 @@ flask_migrate
 pandas
 openpyxl
 gunicorn
+requests
+python-dotenv

@@ -9,10 +9,40 @@
             style="background-color:#d0e8ff; color:#1760a5; transition:0.3s;">
       匯出圖片
     </button>
+    <button id="publishBtn" class="btn btn-lg rounded-pill me-2"
+            style="background-color:#d8f5e9; color:#155724; transition:0.3s;">
+      發佈到DC
+    </button>
     <button id="saveAllBtn" class="btn btn-lg rounded-pill"
             style="background-color:#fcd2e7; color:rgb(13, 35, 107); transition:0.3s;">
       儲存全部
     </button>
+  </div>
+</div>
+
+<!-- 發佈到DC Modal -->
+<div class="modal fade" id="publishModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">發佈編成圖到 Discord</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">貼文內文</label>
+          <textarea id="publishContent" class="form-control" rows="4"></textarea>
+        </div>
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" id="mentionAll">
+          <label class="form-check-label" for="mentionAll">@{{ mention_role_name }}</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-success" id="confirmPublishBtn">確認發佈</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -106,9 +136,10 @@
 
   // ─── 載入玩家資料 ─────────────────────────────────────────
   const allPlayers = {{ players | tojson }};
-  // 將 "|" 分隔的技能字串解析為陣列
+  // 將 "|" 分隔的技能字串解析為陣列，並確保 active_job 有值
   allPlayers.forEach(function(p) {
     p.skills = p.skill ? p.skill.split("|").filter(Boolean) : [];
+    if (!p.active_job) p.active_job = p.job;
   });
 
   // 追蹤每個團隊目前幾組
@@ -201,14 +232,15 @@
     return wrapper;
   }
 
-  // ─── 建立玩家標籤（團隊區：名字 | 多技能勾選）───────────
+  // ─── 建立玩家標籤（團隊區：名字 | 職業切換 | 多技能勾選）──
   function createTeamPlayerTag(player) {
     var div = document.createElement("div");
     div.className = "player-tag player-tag-team";
     div.draggable = true;
     div.dataset.playerId = player.id;
 
-    var jobStyle = JOB_STYLES[player.job] || {bg:"#ccc", fg:"#000"};
+    if (!player.active_job) player.active_job = player.job;
+    var jobStyle = JOB_STYLES[player.active_job] || JOB_STYLES[player.job] || {bg:"#ccc", fg:"#000"};
     div.style.backgroundColor = jobStyle.bg;
     div.style.color = jobStyle.fg;
 
@@ -219,12 +251,38 @@
     var nameSpan = document.createElement("span");
     nameSpan.className = "fw-bold";
     nameSpan.textContent = player.name;
+    div.appendChild(nameSpan);
+
+    // 有副職業才顯示職業切換下拉
+    if (player.sub_job) {
+      var jobSel = document.createElement("select");
+      jobSel.className = "job-select-inline";
+
+      [player.job, player.sub_job].forEach(function(j) {
+        var opt = document.createElement("option");
+        opt.value = j;
+        opt.textContent = j;
+        if (j === player.active_job) opt.selected = true;
+        jobSel.appendChild(opt);
+      });
+
+      jobSel.addEventListener("mousedown", function(e) { e.stopPropagation(); div.draggable = false; });
+      jobSel.addEventListener("mouseup",   function()  { div.draggable = true; });
+      jobSel.addEventListener("change", function(e) {
+        e.stopPropagation();
+        player.active_job = this.value;
+        var newStyle = JOB_STYLES[this.value] || {bg:"#ccc", fg:"#000"};
+        div.style.backgroundColor = newStyle.bg;
+        div.style.color = newStyle.fg;
+        dirtyPlayerIds.add(player.id);
+      });
+
+      div.appendChild(jobSel);
+    }
 
     var sep = document.createElement("span");
     sep.className = "skill-separator";
     sep.textContent = "|";
-
-    div.appendChild(nameSpan);
     div.appendChild(sep);
     div.appendChild(buildSkillMultiSelect(player, div));
 
@@ -253,9 +311,14 @@
       teamBadge = '<span class="badge rounded-pill ' + TEAM_BADGE_CLASS[player.team_name] + '">' + player.team_name + '</span>';
     }
 
+    var subJobBadge = "";
+    if (player.sub_job) {
+      var subJobStyle = JOB_STYLES[player.sub_job] || {bg:"#ccc", fg:"#000"};
+      subJobBadge = '<span class="badge rounded-pill ms-1" style="background-color:' + subJobStyle.bg + '; color:' + subJobStyle.fg + '; opacity:0.75;">副: ' + player.sub_job + '</span>';
+    }
     div.innerHTML =
       '<div class="fw-bold">' + player.name + '</div>' +
-      '<div><span class="badge rounded-pill" style="background-color:' + jobStyle.bg + '; color:' + jobStyle.fg + ';">' + player.job + '</span></div>' +
+      '<div><span class="badge rounded-pill" style="background-color:' + jobStyle.bg + '; color:' + jobStyle.fg + ';">' + player.job + '</span>' + subJobBadge + '</div>' +
       '<div class="mt-1">' + groupBadge + teamBadge + '</div>';
 
     addDragEvents(div, player.id);
@@ -516,7 +579,7 @@
     var changedAssignments = allPlayers
       .filter(function(p) { return dirtyPlayerIds.has(p.id); })
       .map(function(p) {
-        return { id: p.id, group_name: p.group_name || "", team_name: p.team_name || "", skill: p.skills.join("|") };
+        return { id: p.id, group_name: p.group_name || "", team_name: p.team_name || "", skill: p.skills.join("|"), active_job: p.active_job || "" };
       });
     var changedTeamConfigs = Object.values(dirtyTeamConfigs);
 
@@ -599,7 +662,7 @@
         });
         members.forEach(function(p) {
           var tag = document.createElement("div");
-          var js = JOB_STYLES[p.job] || {bg:"#ccc",fg:"#000"};
+          var js = JOB_STYLES[p.active_job] || JOB_STYLES[p.job] || {bg:"#ccc",fg:"#000"};
           tag.style.cssText = "background:" + js.bg + ";color:" + js.fg + ";padding:2px 8px;border-radius:4px;font-size:12px;font-weight:bold;text-align:center;";
           tag.textContent = p.name + (p.skills && p.skills.length ? " | " + p.skills.join(", ") : "");
           slot.appendChild(tag);
@@ -644,6 +707,126 @@
     }).catch(function() {
       document.body.removeChild(wrap);
       alert("匯出圖片失敗");
+    });
+  });
+
+  // ─── 發佈到DC ─────────────────────────────────────────────
+  var PUBLISH_CONTEXT = "{{ publish_context }}";
+
+  document.getElementById("publishBtn").addEventListener("click", function() {
+    var modal = new bootstrap.Modal(document.getElementById("publishModal"));
+    modal.show();
+  });
+
+  document.getElementById("publishBtn").addEventListener("mouseover", function() {
+    this.style.backgroundColor = "#a8e6c4";
+  });
+  document.getElementById("publishBtn").addEventListener("mouseout", function() {
+    this.style.backgroundColor = "#d8f5e9";
+  });
+
+  document.getElementById("confirmPublishBtn").addEventListener("click", function() {
+    var content     = document.getElementById("publishContent").value;
+    var mentionAll  = document.getElementById("mentionAll").checked;
+    var confirmBtn  = this;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "產生圖片中…";
+
+    // 用跟匯出圖片相同的邏輯產生 canvas
+    var GROUPS = ["紅塵拆塔","小崴大團","步步機動"];
+    var GROUP_LABELS = {"紅塵拆塔":"拆塔","小崴大團":"大團","步步機動":"機動"};
+
+    var wrap = document.createElement("div");
+    wrap.style.cssText = "position:fixed;left:-9999px;top:0;width:900px;padding:20px 24px;background:#f8f9fa;font-family:'Microsoft JhengHei',sans-serif;";
+
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:12px;";
+    wrap.appendChild(row);
+
+    GROUPS.forEach(function(gk) {
+      var col = document.createElement("div");
+      col.style.cssText = "flex:1;background:#fff;border-radius:6px;padding:8px 10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);";
+      var header = document.createElement("div");
+      header.style.cssText = "font-weight:bold;font-size:14px;color:" + GROUP_COLORS[gk] + ";margin-bottom:6px;";
+      header.textContent = "【" + GROUP_LABELS[gk] + "】";
+      col.appendChild(header);
+      for (var ti = 0; ti < groupCounts[gk]; ti++) {
+        var teamName = TEAM_NAMES[ti];
+        var lbl = document.createElement("div");
+        lbl.style.cssText = "text-align:center;color:#6c757d;font-size:11px;margin:4px 0 2px;";
+        lbl.textContent = getTeamDisplayName(gk, ti);
+        col.appendChild(lbl);
+        var slot = document.createElement("div");
+        slot.style.cssText = "border:1px dashed #ccc;border-radius:6px;padding:3px;display:flex;flex-direction:column;gap:2px;min-height:24px;";
+        var members = allPlayers.filter(function(p) {
+          return p.group_name === gk && p.team_name === teamName && p.can_fight;
+        });
+        members.forEach(function(p) {
+          var tag = document.createElement("div");
+          var js = JOB_STYLES[p.active_job] || JOB_STYLES[p.job] || {bg:"#ccc",fg:"#000"};
+          tag.style.cssText = "background:" + js.bg + ";color:" + js.fg + ";padding:2px 8px;border-radius:4px;font-size:12px;font-weight:bold;text-align:center;";
+          tag.textContent = p.name + (p.skills && p.skills.length ? " | " + p.skills.join(", ") : "");
+          slot.appendChild(tag);
+        });
+        col.appendChild(slot);
+      }
+      row.appendChild(col);
+    });
+
+    var unassigned = allPlayers.filter(function(p) {
+      return (!p.group_name || !p.team_name) && p.can_fight;
+    });
+    if (unassigned.length > 0) {
+      var subTitle = document.createElement("div");
+      subTitle.style.cssText = "font-size:16px;font-weight:bold;color:#1760a5;margin:16px 0 8px;";
+      subTitle.textContent = "候補區";
+      wrap.appendChild(subTitle);
+      var grid = document.createElement("div");
+      grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;";
+      unassigned.forEach(function(p) {
+        var tag = document.createElement("div");
+        var js = JOB_STYLES[p.active_job] || JOB_STYLES[p.job] || {bg:"#ccc",fg:"#000"};
+        tag.style.cssText = "background:" + js.bg + ";color:" + js.fg + ";padding:4px 8px;border-radius:6px;text-align:center;font-size:12px;font-weight:bold;border:1px solid #dee2e6;";
+        tag.textContent = p.name;
+        grid.appendChild(tag);
+      });
+      wrap.appendChild(grid);
+    }
+
+    document.body.appendChild(wrap);
+    html2canvas(wrap, {scale: 2, backgroundColor: "#f8f9fa"}).then(function(canvas) {
+      document.body.removeChild(wrap);
+      var imageData = canvas.toDataURL("image/png");
+      confirmBtn.textContent = "發佈中…";
+      fetch("/api/publish", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          context:     PUBLISH_CONTEXT,
+          content:     content,
+          mention_all: mentionAll,
+          image:       imageData,
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.status === "success") {
+          bootstrap.Modal.getInstance(document.getElementById("publishModal")).hide();
+          alert("✅ 已成功發佈到 Discord！");
+        } else {
+          alert("❌ 發佈失敗：" + (data.message || "未知錯誤"));
+        }
+      })
+      .catch(function(err) { alert("❌ 發佈失敗：" + err); })
+      .finally(function() {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = "確認發佈";
+      });
+    }).catch(function() {
+      document.body.removeChild(wrap);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "確認發佈";
+      alert("產生圖片失敗");
     });
   });
 

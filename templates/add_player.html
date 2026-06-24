@@ -9,9 +9,19 @@
   </div>
 
   <div class="mb-3">
-    <label for="job" class="form-label">職業</label>
-    <select class="form-select" name="job" required>
+    <label for="main_job" class="form-label">主職業</label>
+    <select class="form-select" name="main_job" required>
       <option value="">請選擇</option>
+      {% for job in all_jobs %}
+      <option value="{{ job.name }}">{{ job.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label for="sub_job" class="form-label">副職業（選填）</label>
+    <select class="form-select" name="sub_job">
+      <option value="">無</option>
       {% for job in all_jobs %}
       <option value="{{ job.name }}">{{ job.name }}</option>
       {% endfor %}
