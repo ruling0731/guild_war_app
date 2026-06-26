@@ -5,6 +5,7 @@ import pandas as pd
 from io import BytesIO
 from collections import defaultdict
 import os
+import time
 import base64
 import json
 import requests as req
@@ -532,16 +533,26 @@ def publish_to_discord():
     role_mention = f"<@&{role_id}>\n" if (mention_all and role_id) else ""
     message = role_mention + content
 
-    resp = req.post(
-        webhook_url,
-        data={"payload_json": json.dumps({"content": message})},
-        files={"files[0]": ("編成圖.png", BytesIO(img_bytes), "image/png")},
-    )
+    import time
 
-    if resp.status_code in (200, 204):
-        return jsonify({"status": "success"})
-    else:
+    for _ in range(3):
+        resp = req.post(
+            webhook_url,
+            data={"payload_json": json.dumps({"content": message})},
+            files={"files[0]": ("編成圖.png", BytesIO(img_bytes), "image/png")},
+        )
+        if resp.status_code in (200, 204):
+            return jsonify({"status": "success"})
+        if resp.status_code == 429:
+            try:
+                retry_after = resp.json().get("retry_after", 1)
+            except Exception:
+                retry_after = float(resp.headers.get("Retry-After", 1))
+            time.sleep(float(retry_after))
+            continue
         return jsonify({"status": "error", "message": f"Discord 回應 {resp.status_code}"}), 500
+
+    return jsonify({"status": "error", "message": "Discord 頻繁限流，請稍後再試"}), 429
 
 
 # ─── Discord Bot API ──────────────────────────────────────────
