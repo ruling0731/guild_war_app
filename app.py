@@ -533,14 +533,19 @@ def publish_to_discord():
     role_mention = f"<@&{role_id}>\n" if (mention_all and role_id) else ""
     message = role_mention + content
 
-    import time
-
     for _ in range(3):
-        resp = req.post(
-            webhook_url,
-            data={"payload_json": json.dumps({"content": message})},
-            files={"files[0]": ("編成圖.png", BytesIO(img_bytes), "image/png")},
-        )
+        try:
+            resp = req.post(
+                webhook_url,
+                data={"payload_json": json.dumps({"content": message})},
+                files={"files[0]": ("編成圖.png", BytesIO(img_bytes), "image/png")},
+                timeout=15,
+            )
+        except req.exceptions.Timeout:
+            return jsonify({"status": "error", "message": "連線 Discord 逾時，請確認 PythonAnywhere 已將 discord.com 加入白名單"}), 500
+        except req.exceptions.RequestException as e:
+            return jsonify({"status": "error", "message": f"連線失敗：{e}"}), 500
+
         if resp.status_code in (200, 204):
             return jsonify({"status": "success"})
         if resp.status_code == 429:
