@@ -537,7 +537,7 @@ def publish_to_discord():
         resp = req.post(
             webhook_url,
             data={"payload_json": json.dumps({"content": message})},
-            files={"files[0]": ("編成圖.png", BytesIO(img_bytes), "image/png")},
+            files={"files[0]": ("編成圖.jpg", BytesIO(img_bytes), "image/jpeg")},
             timeout=15,
         )
     except req.exceptions.Timeout:

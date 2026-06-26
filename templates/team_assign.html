@@ -803,9 +803,9 @@
     }
 
     document.body.appendChild(wrap);
-    html2canvas(wrap, {scale: 2, backgroundColor: "#f8f9fa"}).then(function(canvas) {
+    html2canvas(wrap, {scale: 1.5, backgroundColor: "#f8f9fa"}).then(function(canvas) {
       document.body.removeChild(wrap);
-      var imageData = canvas.toDataURL("image/png");
+      var imageData = canvas.toDataURL("image/jpeg", 0.90);
       confirmBtn.textContent = "發佈中…";
       fetch("/api/publish", {
         method: "POST",
@@ -817,7 +817,13 @@
           image:       imageData,
         })
       })
-      .then(function(r) { return r.json(); })
+      .then(function(r) {
+        var ct = r.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) {
+          throw new Error("伺服器錯誤（HTTP " + r.status + "），請至 PythonAnywhere 查看 Error log");
+        }
+        return r.json();
+      })
       .then(function(data) {
         if (data.status === "success") {
           bootstrap.Modal.getInstance(document.getElementById("publishModal")).hide();
