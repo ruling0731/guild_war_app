@@ -49,9 +49,9 @@
 <!-- 三個團隊欄位 -->
 <div class="row" id="teamsRow">
   {% set teams = [
-    {"key": "紅塵拆塔", "label": "拆塔", "color": "#dc3545"},
-    {"key": "小崴大團", "label": "大團", "color": "#0d6efd"},
-    {"key": "步步機動", "label": "機動", "color": "#ffc107"}
+    {"key": "紅塵拆塔", "label": "進攻一團", "color": "#dc3545"},
+    {"key": "小崴大團", "label": "進攻二團", "color": "#0d6efd"},
+    {"key": "步步機動", "label": "防守團", "color": "#ffc107"}
   ] %}
   {% set team_names = ["第一隊","第二隊","第三隊","第四隊","第五隊"] %}
 
@@ -86,9 +86,9 @@
 (function() {
   // ─── 資料定義 ─────────────────────────────────────────────
   const GROUP_MAP = {
-    "紅塵拆塔": "拆塔",
-    "小崴大團": "大團",
-    "步步機動": "機動"
+    "紅塵拆塔": "進攻一團",
+    "小崴大團": "進攻二團",
+    "步步機動": "防守團"
   };
   const GROUP_COLORS = {
     "紅塵拆塔": "#dc3545",
@@ -638,7 +638,7 @@
   // ─── 匯出圖片 ────────────────────────────────────────────
   document.getElementById("exportImgBtn").addEventListener("click", function() {
     var GROUPS = ["紅塵拆塔","小崴大團","步步機動"];
-    var GROUP_LABELS = {"紅塵拆塔":"拆塔","小崴大團":"大團","步步機動":"機動"};
+    var GROUP_LABELS = {"紅塵拆塔":"進攻一團","小崴大團":"進攻二團","步步機動":"防守團"};
 
     var wrap = document.createElement("div");
     wrap.style.cssText = "position:fixed;left:-9999px;top:0;width:900px;padding:20px 24px;background:#f8f9fa;font-family:'Microsoft JhengHei',sans-serif;";
@@ -743,7 +743,7 @@
 
     // 用跟匯出圖片相同的邏輯產生 canvas
     var GROUPS = ["紅塵拆塔","小崴大團","步步機動"];
-    var GROUP_LABELS = {"紅塵拆塔":"拆塔","小崴大團":"大團","步步機動":"機動"};
+    var GROUP_LABELS = {"紅塵拆塔":"進攻一團","小崴大團":"進攻二團","步步機動":"防守團"};
 
     var wrap = document.createElement("div");
     wrap.style.cssText = "position:fixed;left:-9999px;top:0;width:900px;padding:20px 24px;background:#f8f9fa;font-family:'Microsoft JhengHei',sans-serif;";
